@@ -153,3 +153,22 @@ input{font-family:inherit;} b{font-weight:800;} .hide{display:none!important;}
 .chiprow button,.ve button{width:34px;height:34px;border-radius:50%;background:var(--bad-bg);color:var(--bad);font-size:20px;flex:none;}
 .ve{background:rgba(255,111,125,.12);border-radius:20px;padding:10px 14px;margin-top:8px;display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
 .ve small{color:var(--muted);}.ve p{margin:4px 0 0;font-size:13.5px;color:var(--muted);}
+
+/* قسم الغياب والمخالفات اليومي */
+.fs select{width:100%;background:rgba(246,235,221,.08);border:1px solid var(--line);border-radius:18px;padding:13px 16px;color:var(--ink);font-size:16px;margin:6px 0 8px;outline:0;font-family:inherit;color-scheme:dark;}
+.fs select option,.fs select optgroup{background:#241006;color:var(--ink);}
+.datenav{display:flex;align-items:center;gap:10px;}.datenav .back{flex:none;}.back.flip svg{transform:scaleX(-1);}
+.dsel{flex:1;min-width:0;text-align:center;}.dsel input{margin:0 0 4px;text-align:center;}.dsel small{color:var(--muted);font-size:13px;}
+.att-top .seg2{margin-bottom:0;}
+.attbar{position:sticky;top:env(safe-area-inset-top);z-index:8;background:var(--bg);padding:6px 0 8px;margin-bottom:4px;}
+.attbar .seg2{margin:0 0 8px;}
+.attsum{display:flex;gap:8px;flex-wrap:wrap;font-size:13.5px;color:var(--muted);font-weight:800;}
+.attsum span{padding:5px 12px;border-radius:99px;background:var(--glass);border:1px solid var(--line);}
+.attsum .b{color:var(--bad);background:var(--bad-bg);border-color:transparent;}.attsum .w{color:var(--warn);background:var(--warn-bg);border-color:transparent;}
+.atthint{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.6;}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;margin:18px 6px 8px;font-size:15px;font-weight:800;color:var(--gold);}.sec-h small{color:var(--muted);font-weight:500;font-size:13px;}
+.arow{display:flex;align-items:center;gap:12px;width:100%;text-align:right;background:var(--glass);border:1px solid var(--line);border-radius:22px 22px 22px 10px;padding:10px 12px 10px 14px;}
+.arow .ck{width:34px;height:34px;border-radius:12px;border:2px solid var(--line);flex:none;display:grid;place-items:center;color:transparent;}.arow .ck svg{width:18px;height:18px;}
+.arow .st{font-size:13px;font-weight:800;color:var(--muted);min-width:44px;text-align:center;}
+.arow.m{background:var(--tb);border-color:var(--t);}.arow.m .ck{background:var(--t);border-color:var(--t);color:#1B0C03;}.arow.m .st{color:var(--t);}
+.subh{font-size:15px;font-weight:800;margin:16px 0 8px;}.subh small{color:var(--muted);font-weight:500;}

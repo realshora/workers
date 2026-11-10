@@ -9,6 +9,7 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,12 +18,14 @@
 <header class="top"><div class="logo"><img src="logo-emblem.png" alt=""></div><div><h1 id="title">عمال التجهيز</h1><small id="month">ملفات وتقارير العمال</small></div></header>
 <main class="wrap">
   <section id="v-list"></section>
+  <section id="v-att" class="hide"></section>
   <section id="v-rank" class="hide"></section>
   <section id="v-rep" class="hide"></section>
   <section id="v-data" class="hide"></section>
 </main>
 <nav class="nav">
   <button data-tab="list" data-icon="users" class="on"><span>العمال</span></button>
+  <button data-tab="att" data-icon="cal"><span>الغياب</span></button>
   <button data-tab="rank" data-icon="trophy"><span>الترتيب</span></button>
   <button data-tab="rep" data-icon="doc"><span>التقارير</span></button>
   <button data-tab="data" data-icon="db"><span>البيانات</span></button>
