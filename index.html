@@ -13,7 +13,24 @@
 </head>
 <body>
 <div id="splash"><div class="sp-top"><img src="logo-emblem.png" alt="التوحيد إيجيبت"><small>مرحباً بك في</small><h1>ملفات العمال</h1><p>كل عامل في ملف واحد، وترتيب العمال وتقارير الأقسام في إيدك.</p></div><div class="sp-art"></div>
-<button id="go" aria-label="ابدأ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6M6 19l6-6 6 6"/></svg>ابدأ</button></div>
+<button id="go" type="button" aria-label="ابدأ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6M6 19l6-6 6 6"/></svg>ابدأ</button></div>
+<script>
+(()=>{
+  const splash=document.getElementById('splash'),button=document.getElementById('go');
+  if(!splash||!button)return;
+  const enter=()=>{
+    if(splash.dataset.leaving==='1'||splash.classList.contains('hide'))return;
+    splash.dataset.leaving='1';
+    splash.classList.add('out');
+    window.setTimeout(()=>splash.classList.add('hide'),650);
+    try{sessionStorage.setItem('twh_in','1')}catch(_){}
+  };
+  try{if(sessionStorage.getItem('twh_in'))splash.classList.add('hide')}catch(_){}
+  button.addEventListener('click',enter);
+  button.addEventListener('pointerup',e=>{if(e.pointerType==='touch'){e.preventDefault();enter()}});
+  button.addEventListener('touchend',e=>{e.preventDefault();enter()},{passive:false});
+})();
+</script>
 <header class="top"><div class="logo"><img src="logo-emblem.png" alt=""></div><div><h1 id="title">عمال التجهيز</h1><small id="month"></small></div><button class="gear" data-tab="data" aria-label="البيانات"></button></header>
 <main class="wrap">
   <section id="v-list"></section>

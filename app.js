@@ -693,9 +693,6 @@ $('#back').innerHTML = I.back; $('.gear').innerHTML = I.gear; $('#vioGo').textCo
 $('#bSave').insertAdjacentHTML('afterbegin', I.dl); $('#bWa').insertAdjacentHTML('afterbegin', I.wa); $('#bCopy').insertAdjacentHTML('afterbegin', I.copy);
 document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afterbegin', I[b.dataset.icon]));
 
-const sp = $('#splash');
-if (sessionStorage.getItem('twh_in')) sp.classList.add('hide');
-$('#go').addEventListener('click', () => { sp.classList.add('out'); sessionStorage.setItem('twh_in', '1'); setTimeout(() => sp.classList.add('hide'), 650); });
 load(); renderAll(); setTab('list'); if (loadWarning) toast(loadWarning);
 window.__app = { get D() { return D; }, parseWorkbook, enrich };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
