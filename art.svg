@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 330" preserveAspectRatio="xMidYMax slice"><defs>
+<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8C6238"/><stop offset=".55" stop-color="#4A2710"/><stop offset="1" stop-color="#1B0C03"/></linearGradient>
+<filter id="b1"><feGaussianBlur stdDeviation="5"/></filter><filter id="b2"><feGaussianBlur stdDeviation="14"/></filter></defs>
+<rect width="400" height="330" fill="url(#s)"/>
+<g filter="url(#b1)"><path d="M0 170C60 120 110 130 170 90S290 60 400 120V330H0Z" fill="#B08040" opacity=".5"/>
+<path d="M0 210C80 150 150 190 230 140S350 120 400 160V330H0Z" fill="#704F30" opacity=".8"/>
+<path d="M0 255C90 215 170 245 260 205S360 200 400 225V330H0Z" fill="#3A1D09"/></g>
+<g filter="url(#b2)" fill="#F6E9D6"><ellipse cx="90" cy="170" rx="120" ry="22" opacity=".35"/><ellipse cx="320" cy="215" rx="130" ry="20" opacity=".3"/><ellipse cx="170" cy="250" rx="150" ry="18" opacity=".22"/></g>
+<path d="M322 46a26 26 0 1 0 22 40a20 20 0 1 1-22-40z" fill="#E8C98A" opacity=".85"/></svg>
