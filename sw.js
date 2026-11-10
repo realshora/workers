@@ -1,6 +1,6 @@
 // خدمة التخزين المؤقت: التطبيق يفتح فورًا ويشتغل من غير نت، ويتحدث في الخلفية
-const CACHE = 'twh-workers-v3';
-const FILES = ['./','./index.html','./style.css','./app.js','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./art.svg','./logo-emblem.png',
+const CACHE = 'twh-workers-v4';
+const FILES = ['./','./index.html','./style.css','./app.js','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./art.svg','./data.js','./logo-emblem.png',
   './vendor/xlsx.mini.min.js','./vendor/html-to-image.js',
   './fonts/tajawal-arabic-500-normal.woff2','./fonts/tajawal-arabic-700-normal.woff2','./fonts/tajawal-arabic-800-normal.woff2',
   './fonts/tajawal-latin-500-normal.woff2','./fonts/tajawal-latin-700-normal.woff2','./fonts/tajawal-latin-800-normal.woff2'];

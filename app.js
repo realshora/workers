@@ -248,9 +248,9 @@ function renderData() {
   const el = $('#v-data');
   if (!D) { el.innerHTML = emptyState(); return; }
   el.innerHTML = `<div class="card info"><h3>البيانات الحالية</h3><p>${esc(D.month)}، ${D.workers.length} عامل، ${D.sections.length} أقسام<br>الملف: ${esc(D.fileName || '—')}<br>آخر تحديث: ${esc(D.importedAt || '—')}</p>
-    <div class="row2"><button class="btn" data-act="import">${I.db}تحديث من ملف Excel</button><button class="btn danger" data-act="clear">مسح البيانات</button></div></div>
+    <div class="row2"><button class="btn" data-act="import">${I.db}تحديث من ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>
     <div class="card info"><h3>إزاي أحدّث الشهر الجديد؟</h3><p>حدّث ملف الإكسل زي ما بتعمل، وبعدين اضغط "تحديث من ملف Excel" واختار الملف. كل الملفات والترتيب والتقارير بتتحدث مرة واحدة.</p></div>
-    <div class="card info"><h3>الخصوصية</h3><p>بيانات العمال بتتخزن على موبايلك بس، مش على الإنترنت ومش على GitHub.</p></div>`;
+    <div class="card info"><h3>البيانات</h3><p>بيانات الشهر الحالي مدمجة في التطبيق وبتفتح على طول. لو رفعت ملف جديد، بيتخزن على موبايلك ويحل محلها.</p></div>`;
 }
 function renderAll() { renderList(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : 'ملفات وتقارير العمال'; }
 function setTab(t) {
@@ -306,7 +306,10 @@ let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classLis
 
 /* ---------------- استيراد وتخزين ---------------- */
 function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
-function load() { try { const r = localStorage.getItem(LS); if (r) { D = enrich(JSON.parse(r)); D.fileName = JSON.parse(r).fileName; D.importedAt = JSON.parse(r).importedAt; } } catch (e) { D = null; } }
+function load() {
+  try { const r = localStorage.getItem(LS); if (r) { const p = JSON.parse(r); D = enrich(p); D.fileName = p.fileName; D.importedAt = p.importedAt; return; } } catch (e) {}
+  if (window.BUILTIN) { D = enrich(window.BUILTIN); D.fileName = window.BUILTIN.fileName; D.importedAt = window.BUILTIN.importedAt; D.builtin = true; } else D = null;
+}
 async function importFile(file) {
   try {
     const buf = await file.arrayBuffer();
@@ -329,7 +332,7 @@ document.addEventListener('click', e => {
   if (t.dataset.sec != null && t.closest('#v-list')) { state.sec = t.dataset.sec; return renderList(); }
   if (t.dataset.rsec != null) { state.rsec = t.dataset.rsec; return renderRank(); }
   if (t.dataset.act === 'import') return $('#file').click();
-  if (t.dataset.act === 'clear' && confirm('تمسح كل البيانات من الجهاز؟')) { localStorage.removeItem(LS); D = null; renderAll(); toast('اتمسحت البيانات'); }
+  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
 });
 $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; });
 $('#back').addEventListener('click', () => history.back());
