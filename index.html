@@ -28,15 +28,17 @@
   <button data-tab="data" data-icon="db"><span>البيانات</span></button>
 </nav>
 <div class="page" id="page">
-  <div class="pbar"><button class="back" id="back" aria-label="رجوع"></button><h2 id="ptitle"></h2></div>
+  <div class="pbar"><button class="back" id="back" aria-label="رجوع"></button><h2 id="ptitle"></h2><button class="back hide" id="editBtn" aria-label="تعديل" style="margin-right:auto"></button></div>
   <div class="pbody"><div id="shot" style="padding:14px;background:#1B0C03"></div></div>
 </div>
+<div class="page" id="editor" style="z-index:70"></div>
+<button id="fab" aria-label="إضافة عامل" data-act="add">+</button>
 <div class="actions hide" id="actions"><div class="inner">
   <button class="act main" id="bSave">حفظ صورة</button>
   <button class="act wa" id="bWa">واتساب</button>
   <button class="act" id="bCopy">نسخ</button>
 </div></div>
-<input type="file" id="file" accept=".xlsx,.xlsm,.xls" hidden>
+<input type="file" id="file" accept=".xlsx,.xlsm,.xls,.json" hidden>
 <div class="toast" id="toast"></div>
 <script src="vendor/xlsx.mini.min.js"></script>
 <script src="vendor/html-to-image.js"></script>

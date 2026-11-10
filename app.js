@@ -20,10 +20,12 @@ const I = {
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="3"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
   wa:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.7a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c0-.1-.2-.2-.5-.3z"/></svg>',
   user:'<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.7-4 3.7-6 7.5-6s6.8 2 7.5 6"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
 };
 
 let D = null;           // البيانات بعد المعالجة
+let RAW = null;         // البيانات الخام اللي بتتعدّل
 let state = { tab:'list', q:'', sec:'', rsec:'' };
 
 /* ---------------- قراءة ملف الإكسل ---------------- */
@@ -247,10 +249,9 @@ function renderReports() {
 function renderData() {
   const el = $('#v-data');
   if (!D) { el.innerHTML = emptyState(); return; }
-  el.innerHTML = `<div class="card info"><h3>البيانات الحالية</h3><p>${esc(D.month)}، ${D.workers.length} عامل، ${D.sections.length} أقسام<br>الملف: ${esc(D.fileName || '—')}<br>آخر تحديث: ${esc(D.importedAt || '—')}</p>
-    <div class="row2"><button class="btn" data-act="import">${I.db}تحديث من ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>
-    <div class="card info"><h3>إزاي أحدّث الشهر الجديد؟</h3><p>حدّث ملف الإكسل زي ما بتعمل، وبعدين اضغط "تحديث من ملف Excel" واختار الملف. كل الملفات والترتيب والتقارير بتتحدث مرة واحدة.</p></div>
-    <div class="card info"><h3>البيانات</h3><p>بيانات الشهر الحالي مدمجة في التطبيق وبتفتح على طول. لو رفعت ملف جديد، بيتخزن على موبايلك ويحل محلها.</p></div>`;
+  el.innerHTML = `<div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
+    <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
+    <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
 function renderAll() { renderList(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : 'ملفات وتقارير العمال'; }
 function setTab(t) {
@@ -258,15 +259,17 @@ function setTab(t) {
   ['list','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   $('#title').textContent = { list:'عمال التجهيز', rank:'ترتيب العمال', rep:'التقارير', data:'البيانات' }[t];
+  $('#fab').classList.toggle('hide', t !== 'list');
   window.scrollTo(0, 0);
 }
 
 /* ---------------- صفحة التفاصيل + الصورة ---------------- */
 let cur = null;
-function openPage(title, html, file) {
+function openPage(title, html, file, wid) {
   $('#ptitle').textContent = title;
   $('#shot').innerHTML = html;
-  cur = { title, file, blob: null };
+  cur = { title, file, blob: null, wid: wid == null ? null : wid };
+  $('#editBtn').classList.toggle('hide', wid == null);
   $('#page').classList.add('show'); $('#actions').classList.remove('hide'); $('#page').scrollTop = 0;
   history.pushState({ p: 1 }, '');
   setTimeout(() => getBlob().catch(() => {}), 450);
@@ -306,37 +309,124 @@ let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classLis
 
 /* ---------------- استيراد وتخزين ---------------- */
 function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
+const now = () => new Date().toLocaleString('en-GB', { hour12: false }).slice(0, 17);
+function rebuild() { if (!RAW) { D = null; return; } D = enrich(RAW); D.fileName = RAW.fileName; D.importedAt = RAW.importedAt; D.builtin = !!RAW.builtin; }
 function load() {
-  try { const r = localStorage.getItem(LS); if (r) { const p = JSON.parse(r); D = enrich(p); D.fileName = p.fileName; D.importedAt = p.importedAt; return; } } catch (e) {}
-  if (window.BUILTIN) { D = enrich(window.BUILTIN); D.fileName = window.BUILTIN.fileName; D.importedAt = window.BUILTIN.importedAt; D.builtin = true; } else D = null;
+  try { const r = localStorage.getItem(LS); if (r) RAW = JSON.parse(r); } catch (e) {}
+  if (!RAW && window.BUILTIN) { RAW = JSON.parse(JSON.stringify(window.BUILTIN)); RAW.builtin = true; }
+  rebuild();
+}
+let skipRefresh = false;
+function commit(msg) {
+  RAW.builtin = false; RAW.fileName = RAW.fileName || 'تعديل داخل التطبيق'; RAW.importedAt = now();
+  save(RAW); rebuild(); renderAll(); if (!skipRefresh) refreshPage(); if (msg) toast(msg);
+}
+function refreshPage() {
+  if (!cur || cur.wid == null) return;
+  const w = D.workers[cur.wid]; if (!w) return;
+  $('#shot').innerHTML = workerCard(w); $('#ptitle').textContent = w.name; cur.file = `تقييم ${w.name} - ${D.month}`; cur.blob = null;
+  setTimeout(() => getBlob().catch(() => {}), 450);
 }
 async function importFile(file) {
   try {
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
-    const raw = parseWorkbook(wb);
-    raw.fileName = file.name; raw.importedAt = new Date().toLocaleString('en-GB', { hour12: false }).slice(0, 17);
-    save(raw); D = enrich(raw); D.fileName = raw.fileName; D.importedAt = raw.importedAt;
+    let raw;
+    if (/\.json$/i.test(file.name)) {
+      raw = JSON.parse(await file.text());
+      if (!raw || !Array.isArray(raw.workers)) throw new Error('الملف ده مش نسخة احتياطية صحيحة.');
+      raw.T = raw.T || { ok: 4, follow: 3, alert: 2 };
+    } else {
+      raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' })); raw.fileName = file.name;
+    }
+    raw.importedAt = now(); raw.builtin = false; RAW = raw;
     state.q = ''; state.sec = ''; state.rsec = '';
-    renderAll(); setTab('list'); toast(`تم التحديث: ${D.workers.length} عامل`);
+    commit(`تم التحديث: ${RAW.workers.length} عامل`); setTab('list');
   } catch (e) { console.error(e); toast(e.message || 'مقدرتش أقرا الملف'); }
 }
+
+/* ---------------- تعديل البيانات من التطبيق ---------------- */
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const isoToSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569; };
+let ed = null;
+function openEditor(i) {
+  const base = i >= 0 ? RAW.workers[i] : { name: '', section: '', scores: Array(8).fill(null), status: '', abs: [], vio: [] };
+  ed = { i, w: JSON.parse(JSON.stringify(base)) };
+  const w = ed.w, uniq = f => [...new Set(RAW.workers.flatMap(x => f(x)).filter(Boolean))];
+  const dl = (id, arr) => `<datalist id="${id}">${arr.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : 'تعديل ' + esc(w.name)}</h2></div>
+  <div class="ebody">
+    <div class="fs"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
+      <label>القسم<input id="eSec" list="dlSecs" value="${esc(w.section)}" placeholder="اختار قسم أو اكتب قسم جديد" autocomplete="off"></label>
+      <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
+    <div class="fs"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
+    <div class="fs"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}">
+      <div class="seg2"><button data-e="abs" data-v="غياب">غياب</button><button data-e="abs" data-v="إذن">إذن</button><button data-e="abs" data-v="إجازة">إجازة</button></div><div id="absList"></div></div>
+    <div class="fs"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
+      <button class="btn" data-e="addvio" style="margin-top:10px">إضافة المخالفة</button><div id="vioList"></div></div>
+    ${i >= 0 ? '<button class="btn danger" data-e="del" style="width:100%">حذف العامل</button>' : ''}
+  </div>
+  ${dl('dlSecs', uniq(x => [x.section]))}${dl('dlTypes', uniq(x => x.vio.map(v => v.type)))}${dl('dlActs', uniq(x => x.vio.map(v => v.action)))}
+  <div class="actions"><div class="inner"><button class="act main" data-e="save">حفظ</button><button class="act" data-e="cancel">إلغاء</button></div></div>`;
+  paintEd(); absList(); vioList();
+  $('#editor').classList.add('show'); $('#editor').scrollTop = 0; history.pushState({ e: 1 }, '');
+}
+function closeEditor() { $('#editor').classList.remove('show'); ed = null; }
+function paintEd() {
+  document.querySelectorAll('#eStatus button').forEach(b => b.classList.toggle('on', b.dataset.v === ed.w.status));
+  document.querySelectorAll('.nums button').forEach(b => b.classList.toggle('on', ed.w.scores[+b.dataset.k] === +b.dataset.v));
+}
+function absList() {
+  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
+}
+function vioList() {
+  $('#vioList').innerHTML = ed.w.vio.map((v, n) => `<div class="ve"><div><b>${esc(v.type)}</b><br><small>${fmtDate(v.s)}${v.action ? '، ' + esc(v.action) : ''}</small>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div><button data-e="rmvio" data-n="${n}">×</button></div>`).join('');
+}
+$('#editor').addEventListener('click', e => {
+  const t = e.target.closest('[data-e]'); if (!t || !ed) return;
+  const k = t.dataset.e, v = t.dataset.v;
+  if (k === 'cancel') return history.back();
+  if (k === 'status') { ed.w.status = ed.w.status === v ? '' : v; return paintEd(); }
+  if (k === 'score') { const kk = +t.dataset.k; ed.w.scores[kk] = ed.w.scores[kk] === +v ? null : +v; return paintEd(); }
+  if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v }); absList(); return toast(`اتسجل ${v}`); }
+  if (k === 'rmabs') { ed.w.abs = ed.w.abs.filter(x => x.s !== +t.dataset.n); return absList(); }
+  if (k === 'addvio') { const type = $('#vType').value.trim(), d = $('#vDate').value; if (!type || !d) return toast('اكتب نوع المخالفة والتاريخ'); ed.w.vio.push({ s: isoToSerial(d), type, detail: $('#vDet').value.trim(), action: $('#vAct').value.trim() }); ['vType','vDet','vAct'].forEach(id => $('#' + id).value = ''); vioList(); return toast('اتسجلت المخالفة'); }
+  if (k === 'rmvio') { ed.w.vio.splice(+t.dataset.n, 1); return vioList(); }
+  if (k === 'save') {
+    const name = $('#eName').value.trim(), sec = $('#eSec').value.trim();
+    if (!name) return toast('اكتب اسم العامل');
+    if (!sec) return toast('اختار القسم');
+    if (RAW.workers.some((x, j) => j !== ed.i && x.name.trim() === name)) return toast('فيه عامل بنفس الاسم ده');
+    ed.w.name = name; ed.w.section = sec;
+    if (ed.i < 0) RAW.workers.push(ed.w); else RAW.workers[ed.i] = ed.w;
+    const isNew = ed.i < 0; commit(isNew ? 'اتضاف العامل' : 'اتحفظت التعديلات'); return history.back();
+  }
+  if (k === 'del' && confirm(`تحذف ${ed.w.name} نهائيًا؟`)) {
+    RAW.workers.splice(ed.i, 1); skipRefresh = true; commit('اتحذف العامل'); skipRefresh = false;
+    history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
+  }
+});
+document.addEventListener('change', e => { if (e.target.id === 'monthIn') { const m = e.target.value.trim(); if (m) { RAW.month = m; commit('اتحدّث الشهر'); } } });
 
 /* ---------------- الأحداث ---------------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab],[data-w],[data-r],[data-sec],[data-rsec],[data-act]');
   if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
-  if (t.dataset.w != null) { const w = D.workers[+t.dataset.w]; return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`); }
+  if (t.dataset.w != null) { const w = D.workers[+t.dataset.w]; return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`, w.id); }
   if (t.dataset.r != null) { const s = t.dataset.r; return openPage(s ? 'تقرير ' + s : 'تقرير التجهيز', reportCard(s || null), `تقرير ${s || 'قسم التجهيز'} - ${D.month}`); }
   if (t.dataset.sec != null && t.closest('#v-list')) { state.sec = t.dataset.sec; return renderList(); }
   if (t.dataset.rsec != null) { state.rsec = t.dataset.rsec; return renderRank(); }
-  if (t.dataset.act === 'import') return $('#file').click();
-  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
+  if (t.dataset.act === 'import' || t.dataset.act === 'restore') return $('#file').click();
+  if (t.dataset.act === 'add') return openEditor(-1);
+  if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); return toast('اتحفظت النسخة الاحتياطية'); }
+  if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); } return; }
+  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); RAW = null; load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
 });
 $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; });
 $('#back').addEventListener('click', () => history.back());
-window.addEventListener('popstate', closePage);
+window.addEventListener('popstate', () => { if ($('#editor').classList.contains('show')) closeEditor(); else closePage(); });
+$('#fab').addEventListener('click', () => openEditor(-1));
+$('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
+$('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
 $('#back').innerHTML = I.back;
 $('#bSave').insertAdjacentHTML('afterbegin', I.dl); $('#bWa').insertAdjacentHTML('afterbegin', I.wa); $('#bCopy').insertAdjacentHTML('afterbegin', I.copy);
