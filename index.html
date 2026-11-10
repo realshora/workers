@@ -9,27 +9,28 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="splash"><div class="sp-top"><img src="logo-emblem.png" alt="التوحيد إيجيبت"><small>مرحباً بك في</small><h1>ملفات العمال</h1><p>كل عامل في ملف واحد، وترتيب العمال وتقارير الأقسام في إيدك.</p></div><div class="sp-art"></div>
 <button id="go" aria-label="ابدأ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6M6 19l6-6 6 6"/></svg>ابدأ</button></div>
-<header class="top"><div class="logo"><img src="logo-emblem.png" alt=""></div><div><h1 id="title">عمال التجهيز</h1><small id="month">ملفات وتقارير العمال</small></div></header>
+<header class="top"><div class="logo"><img src="logo-emblem.png" alt=""></div><div><h1 id="title">عمال التجهيز</h1><small id="month">ملفات وتقارير العمال</small></div><button class="gear" data-tab="data" aria-label="البيانات"></button></header>
 <main class="wrap">
   <section id="v-list"></section>
   <section id="v-att" class="hide"></section>
+  <section id="v-vio" class="hide"></section>
   <section id="v-rank" class="hide"></section>
   <section id="v-rep" class="hide"></section>
   <section id="v-data" class="hide"></section>
 </main>
 <nav class="nav">
   <button data-tab="list" data-icon="users" class="on"><span>العمال</span></button>
-  <button data-tab="att" data-icon="cal"><span>الغياب</span></button>
+  <button data-tab="att" data-icon="cal"><span>الحضور</span></button>
+  <button data-tab="vio" data-icon="flag"><span>المخالفات</span></button>
   <button data-tab="rank" data-icon="trophy"><span>الترتيب</span></button>
   <button data-tab="rep" data-icon="doc"><span>التقارير</span></button>
-  <button data-tab="data" data-icon="db"><span>البيانات</span></button>
 </nav>
+<div id="vioBar" class="hide"><button class="btn" id="vioGo"></button></div>
 <div class="page" id="page">
   <div class="pbar"><button class="back" id="back" aria-label="رجوع"></button><h2 id="ptitle"></h2><button class="back hide" id="editBtn" aria-label="تعديل" style="margin-right:auto"></button></div>
   <div class="pbody"><div id="shot" style="padding:14px;background:#1B0C03"></div></div>

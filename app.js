@@ -21,14 +21,15 @@ const I = {
   wa:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.7a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c0-.1-.2-.2-.5-.3z"/></svg>',
   user:'<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.7-4 3.7-6 7.5-6s6.8 2 7.5 6"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
-  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
-  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17M9 15l2 2 4-4"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3.5"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>',
+  flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 5h12l-2.5 4L17 13H5"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
 };
 
 let D = null;           // البيانات بعد المعالجة
 let RAW = null;         // البيانات الخام اللي بتتعدّل
-let state = { tab:'list', q:'', sec:'', rsec:'', att:{ s:null, mode:'abs', type:'غياب', q:'' } };
+let state = { tab:'list', q:'', sec:'', rsec:'' };
 
 /* ---------------- قراءة ملف الإكسل ---------------- */
 function parseWorkbook(wb) {
@@ -255,144 +256,14 @@ function renderData() {
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
-const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const isoToSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569; };
-/* ---------------- قسم الغياب والمخالفات اليومي ---------------- */
-const serialToISO = s => new Date(Math.round((s - 25569) * 86400000)).toISOString().slice(0, 10);
-const fmtDateY = s => `${fmtDate(s)} ${XLSX.SSF.parse_date_code(s).y}`;
-const ABS_TONE = { 'غياب':'bad', 'إذن':'warn', 'إجازة':'none' };
-const attDay = () => state.att.s || (state.att.s = isoToSerial(todayISO()));
-const dayAbs = s => D.workers.map(w => { const a = w.abs.find(x => x.s === s); return a ? { w, t: a.t } : null; }).filter(Boolean);
-const dayVio = s => D.workers.flatMap(w => w.vio.map((v, n) => v.s === s ? { w, v, n } : null).filter(Boolean));
-
-function renderAtt() {
-  const el = $('#v-att');
-  if (!D) { el.innerHTML = emptyState(); return; }
-  const y = window.scrollY, a = state.att, s = attDay(), isToday = s === isoToSerial(todayISO());
-  const rows = dayAbs(s), vios = dayVio(s), c = { 'غياب':0, 'إذن':0, 'إجازة':0 };
-  rows.forEach(r => c[r.t]++);
-  const head = `<div class="fs att-top">
-    <div class="datenav"><button class="back" data-at="prev" aria-label="اليوم السابق">${I.back}</button>
-      <div class="dsel"><input type="date" id="attDate" value="${serialToISO(s)}"><small>${fmtDate(s)}${isToday ? ' (النهاردة)' : ''}</small></div>
-      <button class="back flip" data-at="next" aria-label="اليوم التالي">${I.back}</button></div>
-    ${isToday ? '' : '<button class="fchip" data-at="today" style="margin-top:8px">رجوع لليوم</button>'}
-    <div class="seg2"><button data-at="mode" data-v="abs" class="${a.mode === 'abs' ? 'on' : ''}">الغياب (${rows.length})</button><button data-at="mode" data-v="vio" class="${a.mode === 'vio' ? 'on' : ''}">المخالفات (${vios.length})</button></div></div>`;
-  let body;
-  if (a.mode === 'abs') {
-    body = `<div class="attbar"><div class="seg2">${['غياب','إذن','إجازة'].map(t => `<button data-at="type" data-v="${t}" class="${a.type === t ? 'on' : ''}">${t}</button>`).join('')}</div>
-      <div class="attsum"><span>${D.workers.length - rows.length} حاضر</span><span class="b">${c['غياب']} غياب</span><span class="w">${c['إذن']} إذن</span><span>${c['إجازة']} إجازة</span></div>
-      <div class="atthint">اختار النوع فوق، وبعدين دوس على اسم كل عامل غايب. دوسة تانية بتلغي.</div></div>
-      <label class="search">${I.search}<input id="attQ" placeholder="ابحث باسم العامل" value="${esc(a.q)}" autocomplete="off"></label>
-      <div id="attList"></div>
-      <button class="btn" data-at="report" style="width:100%;margin-top:16px">${I.doc}تقرير الغياب اليومي</button>
-      <button class="btn ghost2" data-at="clearday" style="width:100%;margin-top:8px">مسح تسجيل اليوم ده</button>`;
-  } else {
-    const opts = D.sections.map(sec => `<optgroup label="${esc(sec)}">${D.workers.filter(w => w.section === sec).map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('')}</optgroup>`).join('');
-    const uniq = f => [...new Set(D.workers.flatMap(x => x.vio.map(f)).filter(Boolean))];
-    const dl = (id, arr) => `<datalist id="${id}">${arr.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
-    body = `<div class="fs"><h3>تسجيل مخالفة في ${fmtDate(s)}</h3>
-      <select id="avW"><option value="">اختار العامل</option>${opts}</select>
-      <input id="avType" list="dlT2" placeholder="نوع المخالفة" autocomplete="off">
-      <textarea id="avDet" rows="2" placeholder="التفاصيل"></textarea>
-      <input id="avAct" list="dlA2" placeholder="الإجراء، مثال: خصم" autocomplete="off">
-      <button class="btn" data-at="addvio" style="width:100%;margin-top:6px">إضافة المخالفة</button></div>
-      ${dl('dlT2', uniq(v => v.type))}${dl('dlA2', uniq(v => v.action))}
-      <div class="h2">مخالفات اليوم (${vios.length})</div>
-      ${vios.length ? vios.map(r => `<div class="ve"><div><b>${esc(r.w.name)}</b><br><small>${esc(r.w.section)}${r.v.action ? '، ' + esc(r.v.action) : ''}</small><p style="color:var(--ink)">${esc(r.v.type)}</p>${r.v.detail ? `<p>${esc(r.v.detail)}</p>` : ''}</div><button data-at="rmvio" data-i="${r.w.id}" data-n="${r.n}" aria-label="حذف">×</button></div>`).join('') : '<div class="card empty" style="padding:22px"><p style="margin:0">مفيش مخالفات متسجلة في اليوم ده</p></div>'}
-      <button class="btn" data-at="report" style="width:100%;margin-top:16px">${I.doc}تقرير المخالفات اليومي</button>`;
-  }
-  el.innerHTML = head + body;
-  if (a.mode === 'abs') fillAtt();
-  window.scrollTo(0, y);
-}
-function fillAtt() {
-  const s = attDay(), q = state.att.q.trim(), m = {};
-  dayAbs(s).forEach(r => m[r.w.id] = r.t);
-  const secs = D.sections.map(sec => ({ sec, list: D.workers.filter(w => w.section === sec && (!q || w.name.includes(q))) })).filter(x => x.list.length);
-  $('#attList').innerHTML = secs.length ? secs.map(x => `<div class="sec-h"><span>${esc(x.sec)}</span><small>${x.list.filter(w => m[w.id]).length} من ${x.list.length}</small></div><div class="list">${x.list.map(w => { const t = m[w.id]; return `<button class="arow ${t ? 'm tone-' + ABS_TONE[t] : ''}" data-at="mark" data-i="${w.id}"><span class="ck">${I.check}</span><div class="wmain"><b>${esc(w.name)}</b></div><span class="st">${t || 'حاضر'}</span></button>`; }).join('')}</div>`).join('') : '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
-}
-function attReportCard(s) {
-  const rows = dayAbs(s), n = D.workers.length, c = { 'غياب':0, 'إذن':0, 'إجازة':0 };
-  rows.forEach(r => c[r.t]++);
-  const present = n - rows.length, pct = n ? Math.round(present / n * 100) : 0;
-  const tone = c['غياب'] === 0 ? 'ok' : c['غياب'] / (n || 1) < .1 ? 'warn' : 'bad';
-  const secs = D.sections.map(sec => ({ sec, tot: D.workers.filter(w => w.section === sec).length, out: rows.filter(r => r.w.section === sec) }));
-  const absHtml = rows.length ? secs.filter(x => x.out.length).map(x => `<div class="subh">${esc(x.sec)} <small>(${x.out.length} من ${x.tot})</small></div><div class="dchips">${x.out.map(r => `<span class="dchip tone-${ABS_TONE[r.t]}">${esc(r.w.name)} · ${r.t}</span>`).join('')}</div>`).join('') : '<div class="good">الكل حاضر، مفيش غياب في اليوم ده</div>';
-  const bySec = secs.map(x => { const p = x.tot - x.out.length, r = x.tot ? p / x.tot : 0; return `<div class="mini tone-${r >= .9 ? 'ok' : r >= .75 ? 'warn' : 'bad'}"><div class="mm"><b>${esc(x.sec)}</b><div class="bar"><i style="width:${r * 100}%"></i></div></div><em>${p}/${x.tot}</em></div>`; }).join('');
-  const rep = rows.filter(r => r.t === 'غياب' && r.w.cntAbs >= 3);
-  const repHtml = rep.length ? `<div class="sh">تنبيه: غياب متكرر</div>${rep.map(r => `<div class="vio"><div class="v1"><span>${esc(r.w.name)}</span><span>${esc(r.w.section)}</span></div><b>غياب ${r.w.cntAbs} أيام في الشهر</b></div>`).join('')}` : '';
-  return `<div class="sc tone-${tone}">
-    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(fmtDate(s))}</span></div>
-      <h2>تقرير الغياب اليومي</h2><div class="tags"><span class="tag">${esc(fmtDateY(s))}</span><span class="tag">${n} عامل</span></div>
-      <div class="score"><b>${c['غياب']}</b><span>غائب من ${n}</span></div><span class="stamp">نسبة الحضور ${pct}%</span></div>
-    <div class="sbody">
-      ${tiles([['حاضر', present], ['غياب', c['غياب'], c['غياب'] ? 'hot' : ''], ['إذن', c['إذن']], ['إجازة', c['إجازة']]])}
-      <div class="sh">الغايبين حسب القسم</div>${absHtml}
-      ${repHtml}
-      <div class="sh">الحضور في كل قسم</div>${bySec}
-      ${foot()}
-    </div></div>`;
-}
-function vioReportCard(s) {
-  const rows = dayVio(s), uniq = new Set(rows.map(r => r.w.id)).size;
-  const disc = rows.filter(r => /خصم/.test(r.v.action)).length;
-  const tone = rows.length ? 'bad' : 'ok';
-  const secs = D.sections.map(sec => ({ sec, out: rows.filter(r => r.w.section === sec) })).filter(x => x.out.length);
-  const list = rows.length ? secs.map(x => `<div class="subh">${esc(x.sec)} <small>(${x.out.length})</small></div>${x.out.map(r => `<div class="vio"><div class="v1"><span>${esc(r.w.name)}</span><span>${esc(r.v.action)}</span></div><b>${esc(r.v.type)}</b>${r.v.detail ? `<p>${esc(r.v.detail)}</p>` : ''}</div>`).join('')}`).join('') : '<div class="good">مفيش مخالفات في اليوم ده</div>';
-  const rep = [...new Map(rows.filter(r => r.w.cntVio >= 2).map(r => [r.w.id, r.w])).values()];
-  const repHtml = rep.length ? `<div class="sh">تنبيه: مخالفات متكررة</div>${rep.map(w => `<div class="vio"><div class="v1"><span>${esc(w.name)}</span><span>${esc(w.section)}</span></div><b>${w.cntVio} مخالفات في الشهر</b></div>`).join('')}` : '';
-  return `<div class="sc tone-${tone}">
-    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(fmtDate(s))}</span></div>
-      <h2>تقرير المخالفات اليومي</h2><div class="tags"><span class="tag">${esc(fmtDateY(s))}</span></div>
-      <div class="score"><b>${rows.length}</b><span>مخالفة</span></div><span class="stamp">${rows.length ? uniq + ' عامل مخالف' : 'يوم بدون مخالفات'}</span></div>
-    <div class="sbody">
-      ${tiles([['مخالفات', rows.length, rows.length ? 'hot' : ''], ['عمال', uniq], ['خصم', disc], ['بدون خصم', rows.length - disc]])}
-      <div class="sh">تفاصيل المخالفات</div>${list}
-      ${repHtml}
-      ${foot()}
-    </div></div>`;
-}
-(() => {
-  const root = $('#v-att');
-  root.addEventListener('click', e => {
-    const t = e.target.closest('[data-at]'); if (!t || !D) return;
-    const k = t.dataset.at, a = state.att, s = attDay();
-    if (k === 'prev' || k === 'next') { a.s = s + (k === 'next' ? 1 : -1); return renderAtt(); }
-    if (k === 'today') { a.s = isoToSerial(todayISO()); return renderAtt(); }
-    if (k === 'mode') { a.mode = t.dataset.v; return renderAtt(); }
-    if (k === 'type') { a.type = t.dataset.v; return renderAtt(); }
-    if (k === 'mark') {
-      const w = RAW.workers[+t.dataset.i], ex = w.abs.find(x => x.s === s);
-      w.abs = w.abs.filter(x => x.s !== s); if (!ex || ex.t !== a.type) w.abs.push({ s, t: a.type });
-      return commit();
-    }
-    if (k === 'clearday') {
-      if (!dayAbs(s).length) return toast('مفيش تسجيل في اليوم ده');
-      if (!confirm('تمسح كل الغياب المسجل في اليوم ده؟')) return;
-      RAW.workers.forEach(w => { w.abs = w.abs.filter(x => x.s !== s); }); return commit('اتمسح تسجيل اليوم');
-    }
-    if (k === 'addvio') {
-      const wi = $('#avW').value, type = $('#avType').value.trim();
-      if (wi === '') return toast('اختار العامل'); if (!type) return toast('اكتب نوع المخالفة');
-      RAW.workers[+wi].vio.push({ s, type, detail: $('#avDet').value.trim(), action: $('#avAct').value.trim() });
-      return commit('اتسجلت المخالفة');
-    }
-    if (k === 'rmvio') { if (!confirm('تحذف المخالفة دي؟')) return; RAW.workers[+t.dataset.i].vio.splice(+t.dataset.n, 1); return commit('اتحذفت المخالفة'); }
-    if (k === 'report') {
-      const iso = serialToISO(s);
-      return a.mode === 'abs' ? openPage('تقرير الغياب اليومي', attReportCard(s), `تقرير الغياب ${iso}`) : openPage('تقرير المخالفات اليومي', vioReportCard(s), `تقرير المخالفات ${iso}`);
-    }
-  });
-  root.addEventListener('change', e => { if (e.target.id === 'attDate' && e.target.value) { state.att.s = isoToSerial(e.target.value); renderAtt(); } });
-  root.addEventListener('input', e => { if (e.target.id === 'attQ') { state.att.q = e.target.value; fillAtt(); } });
-})();
-function renderAll() { renderList(); renderAtt(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : 'ملفات وتقارير العمال'; }
+function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : 'ملفات وتقارير العمال'; }
 function setTab(t) {
   state.tab = t;
-  ['list','att','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
+  ['list','att','vio','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  $('#title').textContent = { list:'عمال التجهيز', att:'الغياب والمخالفات', rank:'ترتيب العمال', rep:'التقارير', data:'البيانات' }[t];
+  $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rank:'ترتيب العمال', rep:'التقارير', data:'البيانات' }[t];
   $('#fab').classList.toggle('hide', t !== 'list');
+  if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, data: renderData })[t](); syncVioBar();
   window.scrollTo(0, 0);
 }
 
@@ -477,6 +348,8 @@ async function importFile(file) {
 }
 
 /* ---------------- تعديل البيانات من التطبيق ---------------- */
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const isoToSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569; };
 let ed = null;
 function openEditor(i) {
   const base = i >= 0 ? RAW.workers[i] : { name: '', section: '', scores: Array(8).fill(null), status: '', abs: [], vio: [] };
@@ -537,6 +410,122 @@ $('#editor').addEventListener('click', e => {
 });
 document.addEventListener('change', e => { if (e.target.id === 'monthIn') { const m = e.target.value.trim(); if (m) { RAW.month = m; commit('اتحدّث الشهر'); } } });
 
+/* ---------------- الحضور والمخالفات اليومية ---------------- */
+const att = { iso: todayISO(), type: 'غياب', sec: '', q: '' };
+const vst = { iso: todayISO(), sel: new Set(), sec: '', q: '', type: '', detail: '', action: '' };
+const shiftISO = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`; };
+const dsel = (key, iso) => `<div class="dsel"><button data-dd="${key}:-1" aria-label="اليوم السابق">${I.back}</button><label><input type="date" data-dk="${key}" value="${iso}"><b>${fmtDate(isoToSerial(iso))}</b><small>${iso === todayISO() ? 'النهارده' : 'دوس هنا لتغيير التاريخ'}</small></label><button data-dd="${key}:1" class="flip" aria-label="اليوم التالي">${I.back}</button></div>`;
+const dayStatus = (w, s) => { const a = w.abs.find(x => x.s === s); return a ? a.t : ''; };
+const secChips = (attr, cur) => `<div class="chips"><button class="fchip ${cur ? '' : 'on'}" ${attr}="">الكل</button>${D.sections.map(s => `<button class="fchip ${cur === s ? 'on' : ''}" ${attr}="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
+
+function renderAtt() {
+  const el = $('#v-att'); if (!D) { el.innerHTML = emptyState(); return; }
+  const verb = { 'غياب': 'غايبين', 'إذن': 'واخدين إذن', 'إجازة': 'في إجازة' }[att.type];
+  el.innerHTML = `${dsel('att', att.iso)}
+    <div class="seg2">${['غياب', 'إذن', 'إجازة'].map(t => `<button data-at="${t}" class="${att.type === t ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="hint">دوس على أسماء العمال اللي ${verb} في اليوم ده. دوسة تانية بتشيل التسجيل.</div>
+    <div class="stats" id="attSum"></div>
+    <label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
+    ${secChips('data-asec', att.sec)}<div class="list" id="attRows"></div>
+    <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي</button>`;
+  fillAtt(); $('#aq').addEventListener('input', e => { att.q = e.target.value; fillAtt(); });
+}
+function fillAtt() {
+  const s = isoToSerial(att.iso), q = att.q.trim(), cnt = { 'غياب': 0, 'إذن': 0, 'إجازة': 0 };
+  D.workers.forEach(w => { const t = dayStatus(w, s); if (t) cnt[t]++; });
+  $('#attSum').innerHTML = `<span class="tone-ok">حاضر<b>${D.workers.length - cnt['غياب'] - cnt['إذن'] - cnt['إجازة']}</b></span><span class="tone-bad">غياب<b>${cnt['غياب']}</b></span><span class="tone-warn">إذن<b>${cnt['إذن']}</b></span><span class="tone-none">إجازة<b>${cnt['إجازة']}</b></span>`;
+  const list = D.workers.filter(w => (!att.sec || w.section === att.sec) && (!q || w.name.includes(q)));
+  $('#attRows').innerHTML = list.map(w => { const t = dayStatus(w, s), tone = t === 'غياب' ? 'bad' : t === 'إذن' ? 'warn' : t ? 'none' : 'ok';
+    return `<button class="arow tone-${tone} ${t ? 'is' : ''}" data-aw="${w.id}"><div class="chk">${t ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="stp">${t || 'حاضر'}</div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
+}
+function tapAtt(id) {
+  const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s);
+  w.abs = w.abs.filter(x => x.s !== s); if (!(old && old.t === att.type)) w.abs.push({ s, t: att.type });
+  const y = window.scrollY; commit(); window.scrollTo(0, y);
+}
+
+function renderVio() {
+  const el = $('#v-vio'); if (!D) { el.innerHTML = emptyState(); return; }
+  const s = isoToSerial(vst.iso), log = [];
+  D.workers.forEach(w => w.vio.forEach((v, n) => { if (v.s === s) log.push({ w, v, n }); }));
+  const uniq = f => [...new Set(D.workers.flatMap(w => w.vio.map(f)).filter(Boolean))];
+  const dl = (id, arr) => `<datalist id="${id}">${arr.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  el.innerHTML = `${dsel('vio', vst.iso)}
+    <div class="h2">مخالفات اليوم (${log.length})</div>
+    ${log.length ? log.map(x => `<div class="ve"><div><b>${esc(x.w.name)}</b><br><small>${esc(x.v.type)}${x.v.action ? '، ' + esc(x.v.action) : ''}</small>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}</div><button data-vd="${x.w.id}:${x.n}">×</button></div>`).join('') : '<div class="card info"><p>مفيش مخالفات متسجلة في اليوم ده.</p></div>'}
+    <div class="h2">مخالفة جديدة</div>
+    <div class="card info vform"><input id="vt" list="dlT" placeholder="نوع المخالفة" value="${esc(vst.type)}" autocomplete="off"><textarea id="vd" rows="2" placeholder="التفاصيل">${esc(vst.detail)}</textarea><input id="va" list="dlA" placeholder="الإجراء، مثال: إنذار شفهي" value="${esc(vst.action)}" autocomplete="off"></div>${dl('dlT', uniq(v => v.type))}${dl('dlA', uniq(v => v.action))}
+    <div class="h2">اختار العمال اللي عملوا المخالفة</div>
+    <label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل" value="${esc(vst.q)}" autocomplete="off"></label>
+    ${secChips('data-vsec', vst.sec)}<div class="list" id="vioRows"></div>
+    <button class="btn" data-act="viorep" style="width:100%;margin-top:14px">تقرير المخالفات اليومي</button>`;
+  fillVio();
+  $('#vt').addEventListener('input', e => vst.type = e.target.value); $('#vd').addEventListener('input', e => vst.detail = e.target.value); $('#va').addEventListener('input', e => vst.action = e.target.value);
+  $('#vq').addEventListener('input', e => { vst.q = e.target.value; fillVio(); });
+  syncVioBar();
+}
+function fillVio() {
+  const q = vst.q.trim();
+  const list = D.workers.filter(w => (!vst.sec || w.section === vst.sec) && (!q || w.name.includes(q)));
+  $('#vioRows').innerHTML = list.map(w => { const on = vst.sel.has(w.id);
+    return `<button class="arow tone-bad ${on ? 'is' : ''}" data-vs="${w.id}"><div class="chk">${on ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}${w.cntVio ? '، مخالفات: ' + w.cntVio : ''}</small></div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
+}
+function syncVioBar() {
+  const n = vst.sel.size, show = state.tab === 'vio' && n > 0;
+  $('#vioBar').classList.toggle('hide', !show); $('#vioGo').textContent = `سجّل المخالفة لـ ${n} عامل`;
+}
+function registerVio() {
+  const type = vst.type.trim(), s = isoToSerial(vst.iso), n = vst.sel.size;
+  if (!n) return toast('اختار عامل على الأقل');
+  if (!type) return toast('اكتب نوع المخالفة');
+  vst.sel.forEach(id => RAW.workers[id].vio.push({ s, type, detail: vst.detail.trim(), action: vst.action.trim() }));
+  vst.sel.clear(); vst.type = vst.detail = vst.action = '';
+  commit(`اتسجلت المخالفة لـ ${n} عامل`); syncVioBar();
+}
+
+function attReportCard(iso) {
+  const s = isoToSerial(iso), total = D.workers.length, by = t => D.workers.filter(w => dayStatus(w, s) === t);
+  const A = by('غياب'), P = by('إذن'), L = by('إجازة'), present = total - A.length - P.length - L.length;
+  const block = (title, list, tone) => list.length ? `<div class="sh">${title} (${list.length})</div>${D.sections.filter(sec => list.some(w => w.section === sec)).map(sec => `<div class="grp"><small>${esc(sec)}</small><div class="dchips">${list.filter(w => w.section === sec).map(w => `<span class="dchip tone-${tone}">${esc(w.name)}</span>`).join('')}</div></div>`).join('')}` : '';
+  return `<div class="sc tone-${A.length ? 'warn' : 'ok'}">
+    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
+      <h2>تقرير الحضور اليومي</h2><div class="tags"><span class="tag">${fmtDate(s)}</span></div>
+      <div class="score"><b>${present}</b><span>حاضر من ${total}</span></div><span class="stamp">${A.length ? 'غياب ' + A.length : 'الكل حاضر'}</span></div>
+    <div class="sbody">${tiles([['غياب', A.length, A.length ? 'hot' : ''], ['إذن', P.length], ['إجازة', L.length], ['حاضر', present]])}
+      ${block('غياب', A, 'bad')}${block('إذن', P, 'warn')}${block('إجازة', L, 'none')}
+      ${A.length + P.length + L.length ? '' : '<div class="good" style="margin-top:16px">كل العمال حاضرين</div>'}${foot()}</div></div>`;
+}
+function vioReportCard(iso) {
+  const s = isoToSerial(iso), list = [];
+  D.workers.forEach(w => w.vio.forEach(v => { if (v.s === s) list.push({ w, v }); }));
+  const people = new Set(list.map(x => x.w.id)).size;
+  return `<div class="sc tone-${list.length ? 'bad' : 'ok'}">
+    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
+      <h2>تقرير المخالفات اليومي</h2><div class="tags"><span class="tag">${fmtDate(s)}</span></div>
+      <div class="score"><b>${list.length}</b><span>مخالفة</span></div><span class="stamp">${list.length ? people + ' عامل' : 'مفيش مخالفات'}</span></div>
+    <div class="sbody">${list.length ? list.map(x => `<div class="vio"><div class="v1"><span>${esc(x.w.name)}</span><span>${esc(x.v.action)}</span></div><b>${esc(x.v.type)}</b>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}<p>${esc(x.w.section)}</p></div>`).join('') : '<div class="good">مفيش مخالفات متسجلة في اليوم ده</div>'}${foot()}</div></div>`;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],#vioGo');
+  if (!t || !D) return;
+  const d = t.dataset;
+  if (d.aw != null) return tapAtt(+d.aw);
+  if (d.vs != null) { const id = +d.vs; vst.sel.has(id) ? vst.sel.delete(id) : vst.sel.add(id); t.classList.toggle('is'); t.querySelector('.chk').textContent = vst.sel.has(id) ? '✓' : ''; return syncVioBar(); }
+  if (d.dd) { const [k, n] = d.dd.split(':'); const o = k === 'att' ? att : vst; o.iso = shiftISO(o.iso, +n); return k === 'att' ? renderAtt() : renderVio(); }
+  if (d.at) { att.type = d.at; return renderAtt(); }
+  if (d.asec != null) { att.sec = d.asec; return renderAtt(); }
+  if (d.vsec != null) { vst.sec = d.vsec; return renderVio(); }
+  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
+  if (t.id === 'vioGo') return registerVio();
+  if (d.act === 'attrep') return openPage('تقرير الحضور', attReportCard(att.iso), `حضور ${fmtDate(isoToSerial(att.iso))}`);
+  if (d.act === 'viorep') return openPage('تقرير المخالفات', vioReportCard(vst.iso), `مخالفات ${fmtDate(isoToSerial(vst.iso))}`);
+});
+document.addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.dk; if (!k || !e.target.value) return;
+  (k === 'att' ? att : vst).iso = e.target.value; k === 'att' ? renderAtt() : renderVio();
+});
+
 /* ---------------- الأحداث ---------------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab],[data-w],[data-r],[data-sec],[data-rsec],[data-act]');
@@ -559,7 +548,7 @@ $('#fab').addEventListener('click', () => openEditor(-1));
 $('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
 $('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
-$('#back').innerHTML = I.back;
+$('#back').innerHTML = I.back; $('.gear').innerHTML = I.gear; $('#vioGo').textContent = '';
 $('#bSave').insertAdjacentHTML('afterbegin', I.dl); $('#bWa').insertAdjacentHTML('afterbegin', I.wa); $('#bCopy').insertAdjacentHTML('afterbegin', I.copy);
 document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afterbegin', I[b.dataset.icon]));
 
