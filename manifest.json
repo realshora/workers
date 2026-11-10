@@ -1,8 +1,8 @@
 {
   "id": "workers-app-v2",
-  "name": "ملفات وتقارير العمال — التوحيد إيجيبت",
-  "short_name": "ملفات العمال",
-  "description": "ملف تقييم كل عامل وترتيب العمال وتقارير الأقسام، مع حفظ الصورة وإرسالها بالواتساب",
+  "name": "عمال التجهيز",
+  "short_name": "العمال",
+  "description": "إدارة ملفات العمال والحضور والتقييمات والتقارير",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "./",
@@ -12,8 +12,23 @@
   "background_color": "#1B0C03",
   "theme_color": "#1B0C03",
   "icons": [
-    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

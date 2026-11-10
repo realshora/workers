@@ -158,7 +158,7 @@ function workerCard(w) {
   const vio = w.vio.length ? w.vio.slice().sort((a, b) => a.s - b.s).map(v => `<div class="vio"><div class="v1"><span>${fmtDate(v.s)}</span><span>${esc(v.action)}</span></div><b>${esc(v.type)}</b>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div>`).join('') : `<div class="good">لا توجد مخالفات مسجلة</div>`;
   return `<div class="sc tone-${w.tone}">
     <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      <h2>${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
+      <div class="worker-portrait">${w.photo ? `<img src="${w.photo}" alt="صورة ${esc(w.name)}">` : `<span>${I.user}</span>`}</div><h2>${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
       <div class="score"><b>${fmt(w.avg)}</b><span>من 5</span></div><span class="stamp">${TONE_LABEL[w.tone]}</span></div>
     <div class="sbody">
       ${w.avg != null ? `<div class="duo"><div><b>${w.rank}</b><span>الترتيب العام من ${D.total}</span></div><div><b>${w.srank}</b><span>الترتيب في القسم من ${w.stotal}</span></div></div>` : ''}
@@ -256,7 +256,7 @@ function renderData() {
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
-function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : 'ملفات وتقارير العمال'; }
+function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); if ($('#month')) $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
   state.tab = t;
   ['list','att','vio','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
@@ -273,7 +273,7 @@ function openPage(title, html, file, wid) {
   $('#ptitle').textContent = title;
   $('#shot').innerHTML = html;
   cur = { title, file, blob: null, wid: wid == null ? null : wid };
-  $('#editBtn').classList.toggle('hide', wid == null);
+  $('#editBtn').classList.toggle('hide', wid == null); $('#reBtn').classList.toggle('hide', wid == null); $('#deleteWorkerBtn').classList.toggle('hide', wid == null);
   $('#page').classList.add('show'); $('#actions').classList.remove('hide'); $('#page').scrollTop = 0;
   history.pushState({ p: 1 }, '');
   setTimeout(() => getBlob().catch(() => {}), 450);
@@ -285,10 +285,17 @@ async function getBlob() {
     const node = $('#shot'); const mine = cur;
     mine.blob = (async () => {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      return await htmlToImage.toBlob(node, { pixelRatio: 3, backgroundColor: '#1B0C03', cacheBust: false });
+      await Promise.all([...node.querySelectorAll('img')].map(img => img.complete ? Promise.resolve() : new Promise(resolve => { img.onload=resolve; img.onerror=resolve; })));
+      try {
+        const blob = await htmlToImage.toBlob(node, { pixelRatio: 2, backgroundColor: '#1B0C03', cacheBust: true });
+        if (blob && blob.size) return blob;
+      } catch (err) { console.warn('html-to-image toBlob failed; trying canvas fallback', err); }
+      const canvas = await htmlToImage.toCanvas(node, { pixelRatio: 2, backgroundColor: '#1B0C03', cacheBust: true });
+      return await new Promise((resolve,reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('تعذر تحويل التقرير إلى صورة')), 'image/png'));
     })();
   }
-  return cur.blob;
+  try { return await cur.blob; }
+  catch (e) { cur.blob = null; throw e; }
 }
 function busy(on) { document.querySelectorAll('.act').forEach(b => b.disabled = on); }
 async function withBlob(fn) {
@@ -297,17 +304,43 @@ async function withBlob(fn) {
   catch (e) { console.error(e); toast('حصلت مشكلة في عمل الصورة، جرب تاني'); }
   finally { busy(false); }
 }
-function download(b) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cur.file + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+function download(b) {
+  const url = URL.createObjectURL(b), a = document.createElement('a');
+  a.href = url; a.download = (cur?.file || 'تقرير العمال') + '.png'; a.style.display='none';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
 const doSave = () => withBlob(async b => { download(b); toast('الصورة اتحفظت (في التحميلات)'); });
-const doShare = () => withBlob(async b => {
-  const f = new File([b], cur.file + '.png', { type: 'image/png' });
-  if (navigator.canShare && navigator.canShare({ files: [f] })) {
-    try { await navigator.share({ files: [f], title: cur.title }); } catch (e) { if (e && e.name !== 'AbortError') throw e; }
-  } else { download(b); toast('الصورة اتحفظت، ابعتها من الواتساب'); window.open('https://wa.me/', '_blank'); }
-});
+const doShare = () => {
+  const waTab = window.open('about:blank', '_blank');
+  return withBlob(async b => {
+    const f = new File([b], (cur?.file || 'تقرير العمال') + '.png', { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [f] })) {
+      try { if (waTab) waTab.close(); await navigator.share({ files: [f], title: cur.title, text: cur.title }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; console.warn('Share failed; using WhatsApp fallback',e); }
+    }
+    download(b);
+    const message = encodeURIComponent(`${cur?.title || 'تقرير العمال'} — تم حفظ صورة التقرير. أرفق الصورة من التنزيلات في المحادثة.`);
+    if (waTab) waTab.location.href = `https://wa.me/?text=${message}`;
+    toast(waTab ? 'تم فتح واتساب وحفظ الصورة — أرفقها من التنزيلات' : 'تم حفظ الصورة — افتح واتساب وأرفقها من التنزيلات');
+  });
+};
 const doCopy = () => withBlob(async b => {
-  try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('الصورة اتنسخت، الصقها في أي محادثة'); }
-  catch (e) { toast('المتصفح مش سامح بنسخ الصورة، استخدم حفظ'); }
+  try {
+    if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
+      toast('تم نسخ صورة التقرير'); return;
+    }
+    throw new Error('Clipboard image API unavailable');
+  } catch (e) {
+    try {
+      const textContent = $('#shot').innerText.trim();
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textContent);
+        toast('المتصفح لا يدعم نسخ الصورة؛ تم نسخ نص التقرير');
+      } else toast('نسخ الصورة غير مدعوم هنا؛ استخدم حفظ الصورة');
+    } catch (_) { toast('تعذر النسخ في هذا المتصفح؛ استخدم حفظ الصورة'); }
+  }
 });
 let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('show'), 2600); }
 
@@ -360,8 +393,10 @@ function openEditor(i) {
   <div class="ebody">
     <div class="fs"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
       <label>القسم<input id="eSec" list="dlSecs" value="${esc(w.section)}" placeholder="اختار قسم أو اكتب قسم جديد" autocomplete="off"></label>
+      <label>الصورة الشخصية<input id="ePhoto" type="file" accept="image/*"><small class="photo-note">${w.photo ? "تم إضافة صورة شخصية — اختار صورة جديدة للتغيير" : "اختياري: أضف صورة واضحة للعامل"}</small></label>
+      ${w.photo ? `<div class="photo-preview"><img src="${w.photo}" alt="صورة العامل"><button type="button" class="btn danger" data-e="rmphoto">حذف الصورة</button></div>` : ""}
       <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
-    <div class="fs"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
+    <div class="fs" id="evaluationSection"><h3>التقييم من 1 إلى 5</h3><p class="eval-note">يمكنك تحديث الدرجات في أي وقت ثم حفظ التقييم الجديد.</p>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
     <div class="fs"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}">
       <div class="seg2"><button data-e="abs" data-v="غياب">غياب</button><button data-e="abs" data-v="إذن">إذن</button><button data-e="abs" data-v="إجازة">إجازة</button></div><div id="absList"></div></div>
     <div class="fs"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
@@ -388,6 +423,12 @@ $('#editor').addEventListener('click', e => {
   const t = e.target.closest('[data-e]'); if (!t || !ed) return;
   const k = t.dataset.e, v = t.dataset.v;
   if (k === 'cancel') return history.back();
+  if (k === 'rmphoto') {
+    ed.w.photo = '';
+    const preview = t.closest('.photo-preview'); if (preview) preview.remove();
+    const note = $('.photo-note'); if (note) note.textContent = 'تم حذف الصورة — اضغط حفظ لتأكيد التغيير';
+    return toast('تم حذف الصورة من التعديل الحالي');
+  }
   if (k === 'status') { ed.w.status = ed.w.status === v ? '' : v; return paintEd(); }
   if (k === 'score') { const kk = +t.dataset.k; ed.w.scores[kk] = ed.w.scores[kk] === +v ? null : +v; return paintEd(); }
   if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v }); absList(); return toast(`اتسجل ${v}`); }
@@ -408,6 +449,23 @@ $('#editor').addEventListener('click', e => {
     history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
   }
 });
+
+$('#editor').addEventListener('change', async e => {
+  if (e.target.id !== 'ePhoto' || !ed) return;
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  if (!file.type.startsWith('image/')) return toast('اختار ملف صورة صحيح');
+  try {
+    const img = new Image(), url = URL.createObjectURL(file);
+    await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; img.src=url; });
+    const max=420, scale=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+    ed.w.photo=c.toDataURL('image/jpeg',0.78);
+    toast('تم تجهيز الصورة — اضغط حفظ لحفظها مع بيانات العامل');
+    const note=$('.photo-note'); if(note) note.textContent='تم اختيار الصورة — اضغط حفظ لتأكيدها';
+  } catch(err) { console.error(err); toast('تعذر قراءة الصورة'); }
+});
+
 document.addEventListener('change', e => { if (e.target.id === 'monthIn') { const m = e.target.value.trim(); if (m) { RAW.month = m; commit('اتحدّث الشهر'); } } });
 
 /* ---------------- الحضور والمخالفات اليومية ---------------- */
@@ -421,7 +479,7 @@ const secChips = (attr, cur) => `<div class="chips"><button class="fchip ${cur ?
 function renderAtt() {
   const el = $('#v-att'); if (!D) { el.innerHTML = emptyState(); return; }
   const verb = { 'غياب': 'غايبين', 'إذن': 'واخدين إذن', 'إجازة': 'في إجازة' }[att.type];
-  el.innerHTML = `${dsel('att', att.iso)}
+  el.innerHTML = `<div class="card info attendance-head"><h3>تسجيل الحضور اليومي</h3><p>اختار التاريخ ونوع الحالة، وبعدها اضغط على اسم كل عامل لتسجيلها. الضغط مرة ثانية يلغي التسجيل.</p></div>${dsel('att', att.iso)}
     <div class="seg2">${['غياب', 'إذن', 'إجازة'].map(t => `<button data-at="${t}" class="${att.type === t ? 'on' : ''}">${t}</button>`).join('')}</div>
     <div class="hint">دوس على أسماء العمال اللي ${verb} في اليوم ده. دوسة تانية بتشيل التسجيل.</div>
     <div class="stats" id="attSum"></div>
@@ -546,6 +604,14 @@ $('#back').addEventListener('click', () => history.back());
 window.addEventListener('popstate', () => { if ($('#editor').classList.contains('show')) closeEditor(); else closePage(); });
 $('#fab').addEventListener('click', () => openEditor(-1));
 $('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
+$('#reBtn').addEventListener('click', () => { if (cur && cur.wid != null) { const id = cur.wid; openEditor(id); setTimeout(() => $('#evaluationSection')?.scrollIntoView({behavior:'smooth', block:'start'}), 80); } });
+$('#deleteWorkerBtn').addEventListener('click', () => {
+  if (!cur || cur.wid == null) return;
+  const id=cur.wid, worker=RAW.workers[id];
+  if (!worker || !confirm(`هل أنت متأكد من حذف العامل "${worker.name}"؟ سيتم حذف ملفه وسجل حضوره ومخالفاته من هذا الجهاز.`)) return;
+  RAW.workers.splice(id,1); cur=null; $('#page').classList.remove('show'); $('#actions').classList.add('hide');
+  commit('تم حذف العامل بنجاح');
+});
 $('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
 $('#back').innerHTML = I.back; $('.gear').innerHTML = I.gear; $('#vioGo').textContent = '';
