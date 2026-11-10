@@ -31,6 +31,42 @@ let D = null;           // البيانات بعد المعالجة
 let RAW = null;         // البيانات الخام اللي بتتعدّل
 let state = { tab:'list', q:'', sec:'', rsec:'' };
 
+function isSafePhoto(value) {
+  return typeof value === 'string' && value.length <= 300000 && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+}
+function normalizeRaw(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.workers)) throw new Error('الملف مش نسخة احتياطية صالحة: قائمة العمال غير موجودة.');
+  const validSerial = value => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1 || n > 2958465) return false;
+    try { return !!XLSX.SSF.parse_date_code(n); } catch (_) { return false; }
+  };
+  const limit = (value, fallback) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 1 && n <= 5 ? n : fallback;
+  };
+  const srcT = raw.T && typeof raw.T === 'object' ? raw.T : {};
+  const T = { ok: limit(srcT.ok, 4), follow: limit(srcT.follow, 3), alert: limit(srcT.alert, 2) };
+  const workers = raw.workers.map((w, i) => {
+    if (!w || typeof w !== 'object' || Array.isArray(w)) throw new Error(`بيانات العامل رقم ${i + 1} غير صالحة.`);
+    const name = String(w.name ?? '').trim();
+    if (!name) throw new Error(`اسم العامل رقم ${i + 1} غير موجود؛ لم يتم استبدال البيانات.`);
+    const srcScores = Array.isArray(w.scores) ? w.scores : [];
+    const scores = Array.from({ length: 8 }, (_, k) => {
+      const v = srcScores[k];
+      if (v == null || v === '') return null;
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
+    });
+    const abs = (Array.isArray(w.abs) ? w.abs : []).filter(a => a && validSerial(a.s) && ['غياب', 'إذن', 'إجازة'].includes(String(a.t))).map(a => ({ s: Number(a.s), t: String(a.t) }));
+    const vio = (Array.isArray(w.vio) ? w.vio : []).filter(v => v && typeof v === 'object' && validSerial(v.s) && String(v.type ?? '').trim()).map(v => ({ s: Number(v.s), type: String(v.type).trim(), detail: String(v.detail ?? '').trim(), action: String(v.action ?? '').trim() }));
+    const worker = { name, section: String(w.section ?? '').trim() || 'بدون قسم', scores, status: String(w.status ?? ''), abs, vio };
+    if (isSafePhoto(w.photo)) worker.photo = w.photo;
+    return worker;
+  });
+  return { ...raw, month: String(raw.month ?? '').trim(), T, workers, fileName: String(raw.fileName ?? ''), importedAt: String(raw.importedAt ?? ''), builtin: !!raw.builtin };
+}
+
 /* ---------------- قراءة ملف الإكسل ---------------- */
 function parseWorkbook(wb) {
   const S = n => wb.Sheets[n];
@@ -154,11 +190,11 @@ const foot = () => `<div class="sfoot">AL-TAWHEED EGYPT</div>`;
 
 /* ---------------- بطاقة العامل ---------------- */
 function workerCard(w) {
-  const dayChips = w.abs.length ? `<div class="dchips">${w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${shortDate(a.s)}</span>`).join('')}</div>` : `<div class="good">ملتزم بالحضور، مفيش غياب مسجل</div>`;
+  const dayChips = w.abs.length ? `<div class="dchips">${w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${esc(a.t)}: ${shortDate(a.s)}</span>`).join('')}</div>` : `<div class="good">ملتزم بالحضور، مفيش غياب مسجل</div>`;
   const vio = w.vio.length ? w.vio.slice().sort((a, b) => a.s - b.s).map(v => `<div class="vio"><div class="v1"><span>${fmtDate(v.s)}</span><span>${esc(v.action)}</span></div><b>${esc(v.type)}</b>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div>`).join('') : `<div class="good">لا توجد مخالفات مسجلة</div>`;
   return `<div class="sc tone-${w.tone}">
     <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      <div class="worker-portrait">${w.photo ? `<img src="${w.photo}" alt="صورة ${esc(w.name)}">` : `<span>${I.user}</span>`}</div><h2>${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
+      <h2>${w.photo ? `<img class="worker-photo" src="${esc(w.photo)}" alt="صورة العامل">` : ''}${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
       <div class="score"><b>${fmt(w.avg)}</b><span>من 5</span></div><span class="stamp">${TONE_LABEL[w.tone]}</span></div>
     <div class="sbody">
       ${w.avg != null ? `<div class="duo"><div><b>${w.rank}</b><span>الترتيب العام من ${D.total}</span></div><div><b>${w.srank}</b><span>الترتيب في القسم من ${w.stotal}</span></div></div>` : ''}
@@ -256,7 +292,7 @@ function renderData() {
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
-function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); if ($('#month')) $('#month').textContent = D ? D.month : ''; }
+function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
   state.tab = t;
   ['list','att','vio','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
@@ -273,90 +309,101 @@ function openPage(title, html, file, wid) {
   $('#ptitle').textContent = title;
   $('#shot').innerHTML = html;
   cur = { title, file, blob: null, wid: wid == null ? null : wid };
-  $('#editBtn').classList.toggle('hide', wid == null); $('#reBtn').classList.toggle('hide', wid == null); $('#deleteWorkerBtn').classList.toggle('hide', wid == null);
+  const workerPage = wid != null;
+  $('#editBtn').classList.toggle('hide', !workerPage);
+  $('#reevalBtn').classList.toggle('hide', !workerPage);
+  $('#deleteWorkerBtn').classList.toggle('hide', !workerPage);
   $('#page').classList.add('show'); $('#actions').classList.remove('hide'); $('#page').scrollTop = 0;
   history.pushState({ p: 1 }, '');
   setTimeout(() => getBlob().catch(() => {}), 450);
 }
-function closePage() { $('#page').classList.remove('show'); $('#actions').classList.add('hide'); cur = null; }
-async function getBlob() {
-  if (!cur) throw new Error('no page');
-  if (!cur.blob) {
-    const node = $('#shot'); const mine = cur;
-    mine.blob = (async () => {
-      if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      await Promise.all([...node.querySelectorAll('img')].map(img => img.complete ? Promise.resolve() : new Promise(resolve => { img.onload=resolve; img.onerror=resolve; })));
-      try {
-        const blob = await htmlToImage.toBlob(node, { pixelRatio: 2, backgroundColor: '#1B0C03', cacheBust: true });
-        if (blob && blob.size) return blob;
-      } catch (err) { console.warn('html-to-image toBlob failed; trying canvas fallback', err); }
-      const canvas = await htmlToImage.toCanvas(node, { pixelRatio: 2, backgroundColor: '#1B0C03', cacheBust: true });
-      return await new Promise((resolve,reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('تعذر تحويل التقرير إلى صورة')), 'image/png'));
-    })();
+function closePage() {
+  $('#page').classList.remove('show'); $('#actions').classList.add('hide');
+  $('#reevalBtn').classList.add('hide'); $('#deleteWorkerBtn').classList.add('hide'); cur = null;
+}
+async function renderImageBlob(node) {
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  let lastError = null;
+  for (const pixelRatio of [2, 1]) {
+    try {
+      const blob = await htmlToImage.toBlob(node, { pixelRatio, backgroundColor: '#1B0C03', cacheBust: false });
+      if (blob && blob.size && blob.size <= 24000000) return blob;
+      lastError = new Error('تعذر إنشاء صورة بالحجم المناسب');
+    } catch (e) { lastError = e; }
   }
-  try { return await cur.blob; }
-  catch (e) { cur.blob = null; throw e; }
+  throw lastError || new Error('تعذر إنشاء الصورة');
+}
+async function getBlob() {
+  const target = cur;
+  if (!target) throw new Error('no page');
+  if (!target.blob) target.blob = renderImageBlob($('#shot'));
+  try {
+    const blob = await target.blob;
+    if (!blob) throw new Error('empty image');
+    return blob;
+  } catch (e) {
+    target.blob = null;
+    throw e;
+  }
 }
 function busy(on) { document.querySelectorAll('.act').forEach(b => b.disabled = on); }
 async function withBlob(fn) {
   busy(true);
-  try { const b = await getBlob(); if (!b) throw new Error('empty'); await fn(b); }
-  catch (e) { console.error(e); toast('حصلت مشكلة في عمل الصورة، جرب تاني'); }
+  try { const b = await getBlob(); await fn(b); }
+  catch (e) { console.error(e); toast('حصلت مشكلة في عمل الصورة، حاول مرة أخرى.'); }
   finally { busy(false); }
 }
 function download(b) {
   const url = URL.createObjectURL(b), a = document.createElement('a');
-  a.href = url; a.download = (cur?.file || 'تقرير العمال') + '.png'; a.style.display='none';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  a.href = url; a.download = (cur ? cur.file : 'تقرير العمال') + '.png';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-const doSave = () => withBlob(async b => { download(b); toast('الصورة اتحفظت (في التحميلات)'); });
-const doShare = () => {
-  const waTab = window.open('about:blank', '_blank');
-  return withBlob(async b => {
-    const f = new File([b], (cur?.file || 'تقرير العمال') + '.png', { type: 'image/png' });
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [f] })) {
-      try { if (waTab) waTab.close(); await navigator.share({ files: [f], title: cur.title, text: cur.title }); return; }
-      catch (e) { if (e && e.name === 'AbortError') return; console.warn('Share failed; using WhatsApp fallback',e); }
-    }
-    download(b);
-    const message = encodeURIComponent(`${cur?.title || 'تقرير العمال'} — تم حفظ صورة التقرير. أرفق الصورة من التنزيلات في المحادثة.`);
-    if (waTab) waTab.location.href = `https://wa.me/?text=${message}`;
-    toast(waTab ? 'تم فتح واتساب وحفظ الصورة — أرفقها من التنزيلات' : 'تم حفظ الصورة — افتح واتساب وأرفقها من التنزيلات');
-  });
-};
+const doSave = () => withBlob(async b => { download(b); toast('تم تجهيز الصورة للتنزيل. راجع مجلد التنزيلات.'); });
+const doShare = () => withBlob(async b => {
+  const file = new File([b], (cur ? cur.file : 'تقرير العمال') + '.png', { type: 'image/png' });
+  if (navigator.share) {
+    try {
+      const data = { files: [file], title: cur ? cur.title : 'تقرير العمال' };
+      if (!navigator.canShare || navigator.canShare(data)) { await navigator.share(data); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  download(b); toast('تم حفظ الصورة. أرفقها يدوياً في واتساب من مجلد التنزيلات.');
+});
 const doCopy = () => withBlob(async b => {
   try {
-    if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
-      toast('تم نسخ صورة التقرير'); return;
-    }
-    throw new Error('Clipboard image API unavailable');
-  } catch (e) {
-    try {
-      const textContent = $('#shot').innerText.trim();
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(textContent);
-        toast('المتصفح لا يدعم نسخ الصورة؛ تم نسخ نص التقرير');
-      } else toast('نسخ الصورة غير مدعوم هنا؛ استخدم حفظ الصورة');
-    } catch (_) { toast('تعذر النسخ في هذا المتصفح؛ استخدم حفظ الصورة'); }
-  }
+    if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) throw new Error('clipboard image unsupported');
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
+    toast('الصورة اتنسخت، الصقها في المحادثة.');
+  } catch (e) { toast('نسخ الصور غير متاح في هذا المتصفح؛ استخدم حفظ الصورة.'); }
 });
-let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('show'), 2600); }
+let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('show'), 3200); }
 
 /* ---------------- استيراد وتخزين ---------------- */
-function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
+function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); return true; } catch (e) { return false; } }
 const now = () => new Date().toLocaleString('en-GB', { hour12: false }).slice(0, 17);
+let loadWarning = '';
 function rebuild() { if (!RAW) { D = null; return; } D = enrich(RAW); D.fileName = RAW.fileName; D.importedAt = RAW.importedAt; D.builtin = !!RAW.builtin; }
 function load() {
-  try { const r = localStorage.getItem(LS); if (r) RAW = JSON.parse(r); } catch (e) {}
-  if (!RAW && window.BUILTIN) { RAW = JSON.parse(JSON.stringify(window.BUILTIN)); RAW.builtin = true; }
+  let stored = null;
+  try { stored = localStorage.getItem(LS); } catch (e) { loadWarning = 'تعذر قراءة بيانات الجهاز؛ تم فتح القائمة الأصلية.'; }
+  if (stored) {
+    try { RAW = normalizeRaw(JSON.parse(stored)); }
+    catch (e) {
+      try { localStorage.setItem(LS + '_recovery', stored); localStorage.removeItem(LS); } catch (_) {}
+      RAW = null; loadWarning = 'البيانات المحفوظة غير سليمة؛ تم فتح القائمة الأصلية والاحتفاظ بمحاولة استعادة البيانات.';
+    }
+  }
+  if (!RAW && window.BUILTIN) { RAW = normalizeRaw(JSON.parse(JSON.stringify(window.BUILTIN))); RAW.builtin = true; }
   rebuild();
 }
 let skipRefresh = false;
 function commit(msg) {
   RAW.builtin = false; RAW.fileName = RAW.fileName || 'تعديل داخل التطبيق'; RAW.importedAt = now();
-  save(RAW); rebuild(); renderAll(); if (!skipRefresh) refreshPage(); if (msg) toast(msg);
+  const persisted = save(RAW);
+  rebuild(); renderAll(); if (!skipRefresh) refreshPage();
+  if (!persisted) toast('التعديل ظاهر مؤقتاً لكن لم يُحفظ على الجهاز. صدّر نسخة احتياطية أو أفرغ مساحة.');
+  else if (msg) toast(msg);
+  return persisted;
 }
 function refreshPage() {
   if (!cur || cur.wid == null) return;
@@ -367,15 +414,14 @@ function refreshPage() {
 async function importFile(file) {
   try {
     let raw;
-    if (/\.json$/i.test(file.name)) {
-      raw = JSON.parse(await file.text());
-      if (!raw || !Array.isArray(raw.workers)) throw new Error('الملف ده مش نسخة احتياطية صحيحة.');
-      raw.T = raw.T || { ok: 4, follow: 3, alert: 2 };
-    } else {
-      raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' })); raw.fileName = file.name;
-    }
-    raw.importedAt = now(); raw.builtin = false; RAW = raw;
-    state.q = ''; state.sec = ''; state.rsec = '';
+    if (/\.json$/i.test(file.name)) raw = JSON.parse(await file.text());
+    else raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' }));
+    raw = normalizeRaw(raw);
+    if (RAW && !confirm('استيراد هذا الملف سيستبدل قائمة العمال والسجلات الحالية. احفظ نسخة احتياطية أولاً إذا احتجت إليها. هل تريد المتابعة؟')) return;
+    raw.fileName = raw.fileName || file.name; raw.importedAt = now(); raw.builtin = false;
+    if ($('#editor').classList.contains('show')) closeEditor();
+    if ($('#page').classList.contains('show')) closePage();
+    RAW = raw; resetDailyUi(); state.q = ''; state.sec = ''; state.rsec = '';
     commit(`تم التحديث: ${RAW.workers.length} عامل`); setTab('list');
   } catch (e) { console.error(e); toast(e.message || 'مقدرتش أقرا الملف'); }
 }
@@ -384,19 +430,19 @@ async function importFile(file) {
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isoToSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569; };
 let ed = null;
-function openEditor(i) {
+function openEditor(i, reeval = false) {
   const base = i >= 0 ? RAW.workers[i] : { name: '', section: '', scores: Array(8).fill(null), status: '', abs: [], vio: [] };
   ed = { i, w: JSON.parse(JSON.stringify(base)) };
+  if (reeval && i >= 0) ed.w.scores = Array(8).fill(null);
   const w = ed.w, uniq = f => [...new Set(RAW.workers.flatMap(x => f(x)).filter(Boolean))];
   const dl = (id, arr) => `<datalist id="${id}">${arr.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
-  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : 'تعديل ' + esc(w.name)}</h2></div>
+  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : reeval ? 'إعادة تقييم ' + esc(w.name) : 'تعديل ' + esc(w.name)}</h2></div>
   <div class="ebody">
     <div class="fs"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
       <label>القسم<input id="eSec" list="dlSecs" value="${esc(w.section)}" placeholder="اختار قسم أو اكتب قسم جديد" autocomplete="off"></label>
-      <label>الصورة الشخصية<input id="ePhoto" type="file" accept="image/*"><small class="photo-note">${w.photo ? "تم إضافة صورة شخصية — اختار صورة جديدة للتغيير" : "اختياري: أضف صورة واضحة للعامل"}</small></label>
-      ${w.photo ? `<div class="photo-preview"><img src="${w.photo}" alt="صورة العامل"><button type="button" class="btn danger" data-e="rmphoto">حذف الصورة</button></div>` : ""}
-      <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
-    <div class="fs" id="evaluationSection"><h3>التقييم من 1 إلى 5</h3><p class="eval-note">يمكنك تحديث الدرجات في أي وقت ثم حفظ التقييم الجديد.</p>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
+      <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div>
+      <div class="photo-pick"><div id="photoPreview" class="photo-preview"></div><div class="photo-controls"><label>الصورة الشخصية (اختياري)<input id="ePhoto" type="file" accept="image/*"></label><button type="button" class="btn ghost2 hide" id="removePhoto" data-e="removePhoto">إزالة الصورة</button></div></div></div>
+    <div class="fs"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
     <div class="fs"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}">
       <div class="seg2"><button data-e="abs" data-v="غياب">غياب</button><button data-e="abs" data-v="إذن">إذن</button><button data-e="abs" data-v="إجازة">إجازة</button></div><div id="absList"></div></div>
     <div class="fs"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
@@ -405,16 +451,62 @@ function openEditor(i) {
   </div>
   ${dl('dlSecs', uniq(x => [x.section]))}${dl('dlTypes', uniq(x => x.vio.map(v => v.type)))}${dl('dlActs', uniq(x => x.vio.map(v => v.action)))}
   <div class="actions"><div class="inner"><button class="act main" data-e="save">حفظ</button><button class="act" data-e="cancel">إلغاء</button></div></div>`;
-  paintEd(); absList(); vioList();
+  paintEd(); absList(); vioList(); paintPhotoPreview();
   $('#editor').classList.add('show'); $('#editor').scrollTop = 0; history.pushState({ e: 1 }, '');
 }
 function closeEditor() { $('#editor').classList.remove('show'); ed = null; }
+function paintPhotoPreview() {
+  const box = $('#photoPreview'); if (!box || !ed) return;
+  box.innerHTML = ed.w.photo ? `<img src="${esc(ed.w.photo)}" alt="معاينة صورة العامل">` : I.user;
+  $('#removePhoto').classList.toggle('hide', !ed.w.photo);
+}
+function resizePhoto(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) return reject(new Error('اختار ملف صورة صالح.'));
+    if (file.size > 15000000) return reject(new Error('حجم الصورة كبير؛ اختار صورة أصغر من 15 ميجابايت.'));
+    const url = URL.createObjectURL(file), img = new Image();
+    const cleanup = () => URL.revokeObjectURL(url);
+    img.onerror = () => { cleanup(); reject(new Error('تعذر قراءة الصورة.')); };
+    img.onload = () => {
+      try {
+        const max = 360, scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          cleanup();
+          if (!blob) return reject(new Error('تعذر ضغط الصورة.'));
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('تعذر حفظ الصورة.'));
+          reader.onload = () => {
+            const data = String(reader.result || '');
+            if (!isSafePhoto(data)) return reject(new Error('تعذر تجهيز الصورة بحجم مناسب.'));
+            resolve(data);
+          };
+          reader.readAsDataURL(blob);
+        }, 'image/jpeg', 0.72);
+      } catch (e) { cleanup(); reject(e); }
+    };
+    img.src = url;
+  });
+}
+function deleteWorker(i, fromEditor = false) {
+  const w = RAW && RAW.workers[i];
+  if (!w) return toast('العامل غير موجود.');
+  if (!confirm(`تحذف ${w.name} نهائيًا؟`)) return;
+  RAW.workers.splice(i, 1); resetDailyUi();
+  if (!fromEditor) closePage();
+  skipRefresh = true; commit('اتحذف العامل'); skipRefresh = false;
+  if (fromEditor) {
+    history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
+  } else history.back();
+}
 function paintEd() {
   document.querySelectorAll('#eStatus button').forEach(b => b.classList.toggle('on', b.dataset.v === ed.w.status));
   document.querySelectorAll('.nums button').forEach(b => b.classList.toggle('on', ed.w.scores[+b.dataset.k] === +b.dataset.v));
 }
 function absList() {
-  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
+  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${esc(a.t)}: ${fmtDate(a.s)}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
 }
 function vioList() {
   $('#vioList').innerHTML = ed.w.vio.map((v, n) => `<div class="ve"><div><b>${esc(v.type)}</b><br><small>${fmtDate(v.s)}${v.action ? '، ' + esc(v.action) : ''}</small>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div><button data-e="rmvio" data-n="${n}">×</button></div>`).join('');
@@ -423,12 +515,7 @@ $('#editor').addEventListener('click', e => {
   const t = e.target.closest('[data-e]'); if (!t || !ed) return;
   const k = t.dataset.e, v = t.dataset.v;
   if (k === 'cancel') return history.back();
-  if (k === 'rmphoto') {
-    ed.w.photo = '';
-    const preview = t.closest('.photo-preview'); if (preview) preview.remove();
-    const note = $('.photo-note'); if (note) note.textContent = 'تم حذف الصورة — اضغط حفظ لتأكيد التغيير';
-    return toast('تم حذف الصورة من التعديل الحالي');
-  }
+  if (k === 'removePhoto') { ed.w.photo = ''; paintPhotoPreview(); return; }
   if (k === 'status') { ed.w.status = ed.w.status === v ? '' : v; return paintEd(); }
   if (k === 'score') { const kk = +t.dataset.k; ed.w.scores[kk] = ed.w.scores[kk] === +v ? null : +v; return paintEd(); }
   if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v }); absList(); return toast(`اتسجل ${v}`); }
@@ -444,33 +531,24 @@ $('#editor').addEventListener('click', e => {
     if (ed.i < 0) RAW.workers.push(ed.w); else RAW.workers[ed.i] = ed.w;
     const isNew = ed.i < 0; commit(isNew ? 'اتضاف العامل' : 'اتحفظت التعديلات'); return history.back();
   }
-  if (k === 'del' && confirm(`تحذف ${ed.w.name} نهائيًا؟`)) {
-    RAW.workers.splice(ed.i, 1); skipRefresh = true; commit('اتحذف العامل'); skipRefresh = false;
-    history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
-  }
+  if (k === 'del') return deleteWorker(ed.i, true);
 });
-
 $('#editor').addEventListener('change', async e => {
   if (e.target.id !== 'ePhoto' || !ed) return;
   const file = e.target.files && e.target.files[0]; if (!file) return;
-  if (!file.type.startsWith('image/')) return toast('اختار ملف صورة صحيح');
-  try {
-    const img = new Image(), url = URL.createObjectURL(file);
-    await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; img.src=url; });
-    const max=420, scale=Math.min(1,max/Math.max(img.width,img.height));
-    const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
-    c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
-    ed.w.photo=c.toDataURL('image/jpeg',0.78);
-    toast('تم تجهيز الصورة — اضغط حفظ لحفظها مع بيانات العامل');
-    const note=$('.photo-note'); if(note) note.textContent='تم اختيار الصورة — اضغط حفظ لتأكيدها';
-  } catch(err) { console.error(err); toast('تعذر قراءة الصورة'); }
+  try { ed.w.photo = await resizePhoto(file); paintPhotoPreview(); toast('اتحفظت الصورة داخل بطاقة العامل.'); }
+  catch (err) { toast(err.message || 'تعذر تحميل الصورة.'); }
+  e.target.value = '';
 });
-
 document.addEventListener('change', e => { if (e.target.id === 'monthIn') { const m = e.target.value.trim(); if (m) { RAW.month = m; commit('اتحدّث الشهر'); } } });
 
 /* ---------------- الحضور والمخالفات اليومية ---------------- */
 const att = { iso: todayISO(), type: 'غياب', sec: '', q: '' };
 const vst = { iso: todayISO(), sel: new Set(), sec: '', q: '', type: '', detail: '', action: '' };
+function resetDailyUi() {
+  att.iso = todayISO(); att.type = 'غياب'; att.sec = ''; att.q = '';
+  vst.iso = todayISO(); vst.sel.clear(); vst.sec = ''; vst.q = ''; vst.type = ''; vst.detail = ''; vst.action = '';
+}
 const shiftISO = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`; };
 const dsel = (key, iso) => `<div class="dsel"><button data-dd="${key}:-1" aria-label="اليوم السابق">${I.back}</button><label><input type="date" data-dk="${key}" value="${iso}"><b>${fmtDate(isoToSerial(iso))}</b><small>${iso === todayISO() ? 'النهارده' : 'دوس هنا لتغيير التاريخ'}</small></label><button data-dd="${key}:1" class="flip" aria-label="اليوم التالي">${I.back}</button></div>`;
 const dayStatus = (w, s) => { const a = w.abs.find(x => x.s === s); return a ? a.t : ''; };
@@ -478,12 +556,13 @@ const secChips = (attr, cur) => `<div class="chips"><button class="fchip ${cur ?
 
 function renderAtt() {
   const el = $('#v-att'); if (!D) { el.innerHTML = emptyState(); return; }
+  if (!D.workers.length) { el.innerHTML = `<div class="card info"><h3>لا توجد أسماء عمال</h3><p>أضف العمال من تبويب العمال أو استورد قائمة Excel، ثم ارجع لتسجيل الحضور والغياب.</p><button class="btn" data-tab="list">الذهاب إلى العمال</button></div>`; return; }
   const verb = { 'غياب': 'غايبين', 'إذن': 'واخدين إذن', 'إجازة': 'في إجازة' }[att.type];
-  el.innerHTML = `<div class="card info attendance-head"><h3>تسجيل الحضور اليومي</h3><p>اختار التاريخ ونوع الحالة، وبعدها اضغط على اسم كل عامل لتسجيلها. الضغط مرة ثانية يلغي التسجيل.</p></div>${dsel('att', att.iso)}
+  el.innerHTML = `${dsel('att', att.iso)}
     <div class="seg2">${['غياب', 'إذن', 'إجازة'].map(t => `<button data-at="${t}" class="${att.type === t ? 'on' : ''}">${t}</button>`).join('')}</div>
-    <div class="hint">دوس على أسماء العمال اللي ${verb} في اليوم ده. دوسة تانية بتشيل التسجيل.</div>
+    <div class="hint">اختار التاريخ ونوع الحالة، ثم ابحث عن اسم العامل واضغط عليه لتسجيل ${verb}. الضغط مرة ثانية يلغي التسجيل لهذا اليوم.</div>
     <div class="stats" id="attSum"></div>
-    <label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
+    <label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل لتسجيل الحالة" value="${esc(att.q)}" autocomplete="off"></label>
     ${secChips('data-asec', att.sec)}<div class="list" id="attRows"></div>
     <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي</button>`;
   fillAtt(); $('#aq').addEventListener('input', e => { att.q = e.target.value; fillAtt(); });
@@ -494,7 +573,7 @@ function fillAtt() {
   $('#attSum').innerHTML = `<span class="tone-ok">حاضر<b>${D.workers.length - cnt['غياب'] - cnt['إذن'] - cnt['إجازة']}</b></span><span class="tone-bad">غياب<b>${cnt['غياب']}</b></span><span class="tone-warn">إذن<b>${cnt['إذن']}</b></span><span class="tone-none">إجازة<b>${cnt['إجازة']}</b></span>`;
   const list = D.workers.filter(w => (!att.sec || w.section === att.sec) && (!q || w.name.includes(q)));
   $('#attRows').innerHTML = list.map(w => { const t = dayStatus(w, s), tone = t === 'غياب' ? 'bad' : t === 'إذن' ? 'warn' : t ? 'none' : 'ok';
-    return `<button class="arow tone-${tone} ${t ? 'is' : ''}" data-aw="${w.id}"><div class="chk">${t ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="stp">${t || 'حاضر'}</div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
+    return `<button class="arow tone-${tone} ${t ? 'is' : ''}" data-aw="${w.id}"><div class="chk">${t ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="stp">${esc(t || 'حاضر')}</div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
 }
 function tapAtt(id) {
   const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s);
@@ -504,6 +583,7 @@ function tapAtt(id) {
 
 function renderVio() {
   const el = $('#v-vio'); if (!D) { el.innerHTML = emptyState(); return; }
+  if (!D.workers.length) { el.innerHTML = `<div class="card info"><h3>لا توجد أسماء عمال</h3><p>أضف العمال من تبويب العمال أو استورد قائمة Excel، ثم ارجع لتسجيل المخالفات.</p><button class="btn" data-tab="list">الذهاب إلى العمال</button></div>`; syncVioBar(); return; }
   const s = isoToSerial(vst.iso), log = [];
   D.workers.forEach(w => w.vio.forEach((v, n) => { if (v.s === s) log.push({ w, v, n }); }));
   const uniq = f => [...new Set(D.workers.flatMap(w => w.vio.map(f)).filter(Boolean))];
@@ -513,8 +593,8 @@ function renderVio() {
     ${log.length ? log.map(x => `<div class="ve"><div><b>${esc(x.w.name)}</b><br><small>${esc(x.v.type)}${x.v.action ? '، ' + esc(x.v.action) : ''}</small>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}</div><button data-vd="${x.w.id}:${x.n}">×</button></div>`).join('') : '<div class="card info"><p>مفيش مخالفات متسجلة في اليوم ده.</p></div>'}
     <div class="h2">مخالفة جديدة</div>
     <div class="card info vform"><input id="vt" list="dlT" placeholder="نوع المخالفة" value="${esc(vst.type)}" autocomplete="off"><textarea id="vd" rows="2" placeholder="التفاصيل">${esc(vst.detail)}</textarea><input id="va" list="dlA" placeholder="الإجراء، مثال: إنذار شفهي" value="${esc(vst.action)}" autocomplete="off"></div>${dl('dlT', uniq(v => v.type))}${dl('dlA', uniq(v => v.action))}
-    <div class="h2">اختار العمال اللي عملوا المخالفة</div>
-    <label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل" value="${esc(vst.q)}" autocomplete="off"></label>
+    <div class="h2">اختار اسم العامل أو أكثر ممن ارتكبوا المخالفة</div>
+    <label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل لتحديده" value="${esc(vst.q)}" autocomplete="off"></label>
     ${secChips('data-vsec', vst.sec)}<div class="list" id="vioRows"></div>
     <button class="btn" data-act="viorep" style="width:100%;margin-top:14px">تقرير المخالفات اليومي</button>`;
   fillVio();
@@ -533,10 +613,10 @@ function syncVioBar() {
   $('#vioBar').classList.toggle('hide', !show); $('#vioGo').textContent = `سجّل المخالفة لـ ${n} عامل`;
 }
 function registerVio() {
-  const type = vst.type.trim(), s = isoToSerial(vst.iso), n = vst.sel.size;
-  if (!n) return toast('اختار عامل على الأقل');
+  const type = vst.type.trim(), s = isoToSerial(vst.iso), ids = [...vst.sel].filter(id => RAW.workers[id]), n = ids.length;
+  if (!n) { vst.sel.clear(); syncVioBar(); return toast('اختار عامل على الأقل'); }
   if (!type) return toast('اكتب نوع المخالفة');
-  vst.sel.forEach(id => RAW.workers[id].vio.push({ s, type, detail: vst.detail.trim(), action: vst.action.trim() }));
+  ids.forEach(id => RAW.workers[id].vio.push({ s, type, detail: vst.detail.trim(), action: vst.action.trim() }));
   vst.sel.clear(); vst.type = vst.detail = vst.action = '';
   commit(`اتسجلت المخالفة لـ ${n} عامل`); syncVioBar();
 }
@@ -565,7 +645,7 @@ function vioReportCard(iso) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],#vioGo');
+  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],#vioGo,#vioClear');
   if (!t || !D) return;
   const d = t.dataset;
   if (d.aw != null) return tapAtt(+d.aw);
@@ -574,7 +654,8 @@ document.addEventListener('click', e => {
   if (d.at) { att.type = d.at; return renderAtt(); }
   if (d.asec != null) { att.sec = d.asec; return renderAtt(); }
   if (d.vsec != null) { vst.sec = d.vsec; return renderVio(); }
-  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
+  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); if (RAW.workers[id]) RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
+  if (t.id === 'vioClear') { vst.sel.clear(); fillVio(); return syncVioBar(); }
   if (t.id === 'vioGo') return registerVio();
   if (d.act === 'attrep') return openPage('تقرير الحضور', attReportCard(att.iso), `حضور ${fmtDate(isoToSerial(att.iso))}`);
   if (d.act === 'viorep') return openPage('تقرير المخالفات', vioReportCard(vst.iso), `مخالفات ${fmtDate(isoToSerial(vst.iso))}`);
@@ -589,29 +670,23 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab],[data-w],[data-r],[data-sec],[data-rsec],[data-act]');
   if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
-  if (t.dataset.w != null) { const w = D.workers[+t.dataset.w]; return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`, w.id); }
+  if (t.dataset.w != null) { const w = D && D.workers[+t.dataset.w]; if (!w) return toast('ملف العامل غير متاح؛ حدّث القائمة وجرب مرة أخرى.'); return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`, w.id); }
   if (t.dataset.r != null) { const s = t.dataset.r; return openPage(s ? 'تقرير ' + s : 'تقرير التجهيز', reportCard(s || null), `تقرير ${s || 'قسم التجهيز'} - ${D.month}`); }
   if (t.dataset.sec != null && t.closest('#v-list')) { state.sec = t.dataset.sec; return renderList(); }
   if (t.dataset.rsec != null) { state.rsec = t.dataset.rsec; return renderRank(); }
   if (t.dataset.act === 'import' || t.dataset.act === 'restore') return $('#file').click();
   if (t.dataset.act === 'add') return openEditor(-1);
   if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); return toast('اتحفظت النسخة الاحتياطية'); }
-  if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); } return; }
-  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); RAW = null; load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
+  if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); vst.sel.clear(); commit('بدأ الشهر الجديد'); } return; }
+  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); RAW = null; resetDailyUi(); load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
 });
 $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; });
 $('#back').addEventListener('click', () => history.back());
 window.addEventListener('popstate', () => { if ($('#editor').classList.contains('show')) closeEditor(); else closePage(); });
 $('#fab').addEventListener('click', () => openEditor(-1));
 $('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
-$('#reBtn').addEventListener('click', () => { if (cur && cur.wid != null) { const id = cur.wid; openEditor(id); setTimeout(() => $('#evaluationSection')?.scrollIntoView({behavior:'smooth', block:'start'}), 80); } });
-$('#deleteWorkerBtn').addEventListener('click', () => {
-  if (!cur || cur.wid == null) return;
-  const id=cur.wid, worker=RAW.workers[id];
-  if (!worker || !confirm(`هل أنت متأكد من حذف العامل "${worker.name}"؟ سيتم حذف ملفه وسجل حضوره ومخالفاته من هذا الجهاز.`)) return;
-  RAW.workers.splice(id,1); cur=null; $('#page').classList.remove('show'); $('#actions').classList.add('hide');
-  commit('تم حذف العامل بنجاح');
-});
+$('#reevalBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid, true); });
+$('#deleteWorkerBtn').addEventListener('click', () => { if (cur && cur.wid != null) deleteWorker(cur.wid, false); });
 $('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
 $('#back').innerHTML = I.back; $('.gear').innerHTML = I.gear; $('#vioGo').textContent = '';
@@ -621,7 +696,7 @@ document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afte
 const sp = $('#splash');
 if (sessionStorage.getItem('twh_in')) sp.classList.add('hide');
 $('#go').addEventListener('click', () => { sp.classList.add('out'); sessionStorage.setItem('twh_in', '1'); setTimeout(() => sp.classList.add('hide'), 650); });
-load(); renderAll(); setTab('list');
+load(); renderAll(); setTab('list'); if (loadWarning) toast(loadWarning);
 window.__app = { get D() { return D; }, parseWorkbook, enrich };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
