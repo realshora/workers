@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '8';
+const VER = '9';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -159,21 +159,34 @@ const foot = () => `<div class="sfoot">AL-TAWHEED EGYPT</div>`;
 
 /* ---------------- بطاقة العامل ---------------- */
 function workerCard(w) {
-  const dayChips = w.abs.length ? `<div class="dchips">${w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${shortDate(a.s)}</span>`).join('')}</div>` : `<div class="good">ملتزم بالحضور، مفيش غياب مسجل</div>`;
-  const vio = w.vio.length ? w.vio.slice().sort((a, b) => a.s - b.s).map(v => `<div class="vio"><div class="v1"><span>${fmtDate(v.s)}</span><span>${esc(v.action)}</span></div><b>${esc(v.type)}</b>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div>`).join('') : `<div class="good">لا توجد مخالفات مسجلة</div>`;
-  return `<div class="sc tone-${w.tone}">
-    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      ${w.photo ? `<img class="hphoto" src="${w.photo}" alt="">` : ''}<h2>${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
-      <div class="score"><b>${fmt(w.avg)}</b><span>من 5</span></div><span class="stamp">${TONE_LABEL[w.tone]}</span></div>
-    <div class="sbody">
-      ${w.avg != null ? `<div class="duo"><div><b>${w.rank}</b><span>الترتيب العام من ${D.total}</span></div><div><b>${w.srank}</b><span>الترتيب في القسم من ${w.stotal}</span></div></div>${w.prevAvg != null ? (() => { const df = Math.round((w.avg - w.prevAvg) * 100) / 100; return `<div class="trend tone-${df > 0 ? 'ok' : df < 0 ? 'bad' : 'none'}">التقييم السابق ${fmt(w.prevAvg)}، ${df > 0 ? 'ارتفع ' + fmt(df) : df < 0 ? 'انخفض ' + fmt(-df) : 'ثابت'}</div>`; })() : ''}` : ''}
-      ${tiles([['غياب', w.cntAbs, w.cntAbs >= 3 ? 'hot' : ''], ['إذن', w.cntPerm], ['إجازة', w.cntLeave], ['مخالفات', w.cntVio, w.cntVio ? 'hot' : '']])}
-      ${w.alerts.length ? `<div class="vio" style="margin-top:12px"><div class="v1"><span>تنبيه</span></div><b>درجة منخفضة في: ${w.alerts.join(' و ')}</b></div>` : ''}
-      <div class="sh">التقييم التفصيلي</div>${w.complete ? critRows(w.scores, true) + insight(w.scores) : `<div class="good" style="background:var(--none-bg)">لم يتم إدخال تقييم هذا الشهر</div>`}
-      <div class="sh">سجل الغياب</div>${dayChips}
-      <div class="sh">المخالفات</div>${vio}
-      ${foot()}
-    </div></div>`;
+  const cc = v => v == null ? 'none' : v >= 4 ? 'ok' : v >= 3 ? 'warn' : 'bad';
+  const crit = CRIT.map((n, k) => { const v = w.scores[k]; return `<div class="rs-c c-${cc(v)}"><div class="t"><span>${n}</span><b>${v == null ? '—' : v}</b></div><div class="seg3">${[1, 2, 3, 4, 5].map(x => `<i class="${v != null && x <= v ? 'on' : ''}"></i>`).join('')}</div></div>`; }).join('');
+  let ins = '';
+  if (w.complete) {
+    const mx = Math.max(...w.scores), mn = Math.min(...w.scores);
+    ins = mx === mn ? `<div class="rs-ins"><div class="up">مستوى متوازن في كل الجوانب<b>${mx} من 5</b></div></div>` : `<div class="rs-ins"><div class="up">أقوى نقطة<b>${CRIT[w.scores.indexOf(mx)]}</b></div><div class="dn">محتاج تحسين<b>${CRIT[w.scores.indexOf(mn)]}</b></div></div>`;
+  }
+  const abs = w.abs.slice().sort((x, y) => x.s - y.s);
+  const absRows = abs.length ? abs.map(x => `<tr><td>${fmtDate(x.s)}</td><td>${x.t}</td><td class="mut">${esc(x.r || '—')}</td></tr>`).join('') : '<tr><td colspan="3" class="mut" style="text-align:center">لا يوجد غياب أو إذن أو إجازة</td></tr>';
+  const vio = w.vio.slice().sort((x, y) => x.s - y.s);
+  const vioRows = vio.length ? vio.map(x => `<tr><td>${fmtDate(x.s)}</td><td>${esc(x.type)}${x.detail ? ': ' + esc(x.detail) : ''}</td><td class="mut">${esc(x.action || '—')}</td></tr>`).join('') : '<tr><td colspan="3" class="mut" style="text-align:center">لا توجد مخالفات مسجلة</td></tr>';
+  let prev = '';
+  if (w.prevAvg != null && w.avg != null) { const df = Math.round((w.avg - w.prevAvg) * 100) / 100; prev = `<div class="sd-prev">التقييم السابق ${fmt(w.prevAvg)}، ${df > 0 ? 'ارتفع ' + fmt(df) : df < 0 ? 'انخفض ' + fmt(-df) : 'ثابت'}</div>`; }
+  const ev = w.avg != null;
+  return `<div class="fit"><div class="sheet tone-${w.tone}">
+    <aside class="sd"><div class="sd-top"><div class="sd-logo"><img src="logo-emblem.png" alt=""></div><h3>التوحيد إيجيبت</h3><small>AL-TAWHEED EGYPT</small>
+      <div class="sd-score"><b>${fmt(w.avg)}</b><span>من 5</span></div><span class="sd-pill">${TONE_LABEL[w.tone]}</span>${prev}</div>
+      <div class="rk2"><b>${ev ? w.rank : '—'}${ev ? `<small>${D.total} /</small>` : ''}</b><span>الترتيب العام</span></div>
+      <div class="rk2"><b>${ev ? w.srank : '—'}${ev ? `<small>${w.stotal} /</small>` : ''}</b><span>الترتيب في القسم</span></div>
+      <div class="sd-tiles"><div><b>${w.cntAbs}</b><span>غياب</span></div><div><b>${w.cntPerm}</b><span>إذن</span></div><div><b>${w.cntLeave}</b><span>إجازة</span></div><div><b>${w.cntVio}</b><span>مخالفات</span></div></div><i class="sd-line"></i></aside>
+    <main class="rs-main"><i class="rs-bar"></i><div class="rs-top"><span>قسم التجهيز</span><b>${esc(D.month)}</b></div><div class="rs-title">تقرير تقييم الأداء الشهري</div>
+      <div class="rs-who"><div><h1 class="rs-name">${esc(w.name)}</h1><div class="rs-tags"><span>${esc(w.section)}</span>${w.status ? `<span>عامل ${esc(w.status)}</span>` : ''}</div></div>${w.photo ? `<img class="rs-ph" src="${w.photo}" alt="">` : ''}</div>
+      ${w.alerts.length ? `<div class="rs-al">تنبيه: درجة منخفضة في ${w.alerts.join(' و ')}</div>` : ''}
+      <div class="rs-h">التقييم التفصيلي</div>${w.complete ? `<div class="rs-cr">${crit}</div>${ins}` : '<div class="rs-none">لم يتم إدخال تقييم هذا الشهر</div>'}
+      <div class="rs-h">سجل الغياب والإذن والإجازات</div><table class="rs-t"><colgroup><col style="width:34%"><col style="width:20%"><col></colgroup><thead><tr><th>التاريخ</th><th>النوع</th><th>السبب</th></tr></thead><tbody>${absRows}</tbody></table>
+      <div class="rs-h">المخالفات</div><table class="rs-t"><colgroup><col style="width:30%"><col><col style="width:22%"></colgroup><thead><tr><th>التاريخ</th><th>سبب المخالفة</th><th>الإجراء</th></tr></thead><tbody>${vioRows}</tbody></table>
+      <div class="rs-sign"><div>مسؤول القسم</div><div>مدير الإنتاج</div></div><div class="rs-foot">AL-TAWHEED EGYPT</div>
+    </main></div></div>`;
 }
 
 /* ---------------- بطاقة تقرير القسم / الكل ---------------- */
@@ -276,9 +289,19 @@ function setTab(t) {
 
 /* ---------------- صفحة التفاصيل + الصورة ---------------- */
 let cur = null;
+function fitSheet() {
+  const fit = document.querySelector('#shot .fit'); if (!fit) return;
+  const sh = fit.firstElementChild, sc = Math.min(1, fit.clientWidth / 800);
+  sh.style.transform = `scale(${sc})`; fit.style.height = Math.ceil(sh.offsetHeight * sc) + 'px';
+}
+function setShot(html) {
+  const s = $('#shot'); s.innerHTML = html; s.classList.toggle('wide', !!s.querySelector('.sheet'));
+  fitSheet(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSheet);
+}
+window.addEventListener('resize', fitSheet);
 function openPage(title, html, file, wid) {
   $('#ptitle').textContent = title;
-  $('#shot').innerHTML = html;
+  setShot(html);
   cur = { title, file, blob: null, wid: wid == null ? null : wid };
   $('#editBtn').classList.toggle('hide', wid == null); $('#wbtns').classList.toggle('hide', wid == null);
   $('#page').classList.add('show'); $('#actions').classList.remove('hide'); $('#page').scrollTop = 0;
@@ -294,11 +317,13 @@ async function getBlob() {
 async function renderPng(node) {
   if (typeof htmlToImage === 'undefined') throw new Error('ملف html-to-image.js مش مرفوع على GitHub. دوس فحص ملفات التطبيق في تبويب البيانات.');
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
-  const w = node.offsetWidth, h = node.offsetHeight;
+  const sheet = node.querySelector('.sheet'), target = sheet || node;
+  const opt = sheet ? { style: { transform: 'none' }, backgroundColor: '#FCF7F0' } : { backgroundColor: '#1B0C03' };
+  const w = target.offsetWidth, h = target.offsetHeight;
   const r = Math.min(3, 4096 / w, 5200 / h, Math.sqrt(7e6 / (w * h)));
   let lastErr;
   for (const ratio of [r, Math.min(r, 1.6), 1]) {
-    try { const b = await htmlToImage.toBlob(node, { pixelRatio: Math.max(ratio, .8), backgroundColor: '#1B0C03', cacheBust: false }); if (b && b.size > 1000) return b; }
+    try { const b = await htmlToImage.toBlob(target, Object.assign({ pixelRatio: Math.max(ratio, .8), cacheBust: false }, opt)); if (b && b.size > 1000) return b; }
     catch (e) { lastErr = e; console.error(e); }
   }
   throw lastErr || new Error('empty image');
@@ -348,7 +373,7 @@ function commit(msg) {
 function refreshPage() {
   if (!cur || cur.wid == null) return;
   const w = D.workers[cur.wid]; if (!w) return;
-  $('#shot').innerHTML = workerCard(w); $('#ptitle').textContent = w.name; cur.file = `تقييم ${w.name} - ${D.month}`; cur.blob = null;
+  setShot(workerCard(w)); $('#ptitle').textContent = w.name; cur.file = `تقييم ${w.name} - ${D.month}`; cur.blob = null;
   setTimeout(() => getBlob().catch(() => {}), 450);
 }
 async function importFile(file) {
@@ -384,7 +409,7 @@ function openEditor(i, mode) {
       <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
     <div class="fs" id="sScores"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
     <div class="fs${hd}"><h3>صورة العامل</h3><div class="phrow"><div class="phbox" id="phBox">${w.photo ? `<img src="${w.photo}" alt="">` : 'بدون صورة'}</div><div><label class="btn ghost2 sm" for="phFile">اختيار صورة</label><input type="file" id="phFile" accept="image/*" hidden><button class="btn danger sm" data-e="rmphoto">حذف الصورة</button></div></div></div>
-    <div class="fs${hd}"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}">
+    <div class="fs${hd}"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}"><input id="aReason" placeholder="السبب (اختياري)" autocomplete="off">
       <div class="seg2"><button data-e="abs" data-v="غياب">غياب</button><button data-e="abs" data-v="إذن">إذن</button><button data-e="abs" data-v="إجازة">إجازة</button></div><div id="absList"></div></div>
     <div class="fs${hd}"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
       <button class="btn" data-e="addvio" style="margin-top:10px">إضافة المخالفة</button><div id="vioList"></div></div>
@@ -402,7 +427,7 @@ function paintEd() {
   document.querySelectorAll('.nums button').forEach(b => b.classList.toggle('on', ed.w.scores[+b.dataset.k] === +b.dataset.v));
 }
 function absList() {
-  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
+  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}${a.r ? ' (' + esc(a.r) + ')' : ''}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
 }
 function vioList() {
   $('#vioList').innerHTML = ed.w.vio.map((v, n) => `<div class="ve"><div><b>${esc(v.type)}</b><br><small>${fmtDate(v.s)}${v.action ? '، ' + esc(v.action) : ''}</small>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div><button data-e="rmvio" data-n="${n}">×</button></div>`).join('');
@@ -423,7 +448,7 @@ $('#editor').addEventListener('click', e => {
   if (k === 'rmphoto') { delete ed.w.photo; $('#phBox').textContent = 'بدون صورة'; return; }
   if (k === 'status') { ed.w.status = ed.w.status === v ? '' : v; return paintEd(); }
   if (k === 'score') { const kk = +t.dataset.k; ed.w.scores[kk] = ed.w.scores[kk] === +v ? null : +v; return paintEd(); }
-  if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v }); absList(); return toast(`اتسجل ${v}`); }
+  if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v, r: $('#aReason').value.trim() }); $('#aReason').value = ''; absList(); return toast(`اتسجل ${v}`); }
   if (k === 'rmabs') { ed.w.abs = ed.w.abs.filter(x => x.s !== +t.dataset.n); return absList(); }
   if (k === 'addvio') { const type = $('#vType').value.trim(), d = $('#vDate').value; if (!type || !d) return toast('اكتب نوع المخالفة والتاريخ'); ed.w.vio.push({ s: isoToSerial(d), type, detail: $('#vDet').value.trim(), action: $('#vAct').value.trim() }); ['vType','vDet','vAct'].forEach(id => $('#' + id).value = ''); vioList(); return toast('اتسجلت المخالفة'); }
   if (k === 'rmvio') { ed.w.vio.splice(+t.dataset.n, 1); return vioList(); }

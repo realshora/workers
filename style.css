@@ -186,3 +186,61 @@ input{font-family:inherit;} b{font-weight:800;} .hide{display:none!important;}
 .phbox{width:92px;height:92px;border-radius:50%;background:rgba(246,235,221,.08);border:1px dashed var(--line);display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:12px;text-align:center;flex:none;}.phbox img{width:100%;height:100%;object-fit:cover;}
 .btn.sm{padding:10px 18px;font-size:14px;margin-bottom:8px;display:flex;}
 #fixbtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:400;background:#2A1305;color:#fff;padding:11px 20px;border-radius:99px;font-size:14px;font-family:inherit;border:1px solid var(--gold);}
+
+/* ===== تقرير العامل (ورقة A4 بتتصغر على الموبايل وتتصدّر بالحجم الكامل) ===== */
+#shot.wide{padding:0!important;background:transparent!important;}
+.fit{width:100%;overflow:hidden;border-radius:8px;}
+.sheet{--p:#CDBFAE;width:800px;min-height:1131px;background:#FCF7F0;color:#2A1B10;display:grid;grid-template-columns:200px 1fr;column-gap:46px;padding:0 44px;direction:rtl;font-family:'Tajawal',sans-serif;transform-origin:top right;position:relative;}
+.sheet *{box-sizing:border-box;}
+.sheet.tone-ok{--p:#5ED9A4;}.sheet.tone-warn{--p:#FFB05C;}.sheet.tone-bad{--p:#FF7C89;}.sheet.tone-none{--p:#CDBFAE;}
+.sheet .sd{display:flex;flex-direction:column;align-items:center;}
+.sheet .sd-top{width:200px;background:linear-gradient(180deg,#9A6B3F 0%,#5C3A1E 45%,#2E1A0E 100%);color:#F6EBDD;text-align:center;padding:38px 14px 28px;border-radius:0 0 16px 16px;}
+.sheet .sd-logo{width:96px;height:96px;margin:0 auto 18px;border-radius:22px;background:rgba(255,255,255,.12);display:grid;place-items:center;}
+.sheet .sd-logo img{width:80px;height:auto;}
+.sheet .sd-top h3{margin:0;font-size:26px;font-weight:800;}
+.sheet .sd-top small{display:block;font-size:11px;letter-spacing:1.6px;margin:6px 0 28px;opacity:.85;direction:ltr;}
+.sheet .sd-score b{display:block;font-size:78px;line-height:1;font-weight:800;letter-spacing:-2px;}
+.sheet .sd-score span{font-size:16px;opacity:.85;}
+.sheet .sd-pill{display:inline-block;margin-top:22px;padding:9px 16px;border-radius:99px;background:var(--p);color:#2A1305;font-size:15px;font-weight:800;}
+.sheet .sd-prev{margin-top:12px;font-size:12.5px;opacity:.9;}
+.sheet .rk2{text-align:center;margin-top:34px;}
+.sheet .rk2 b{display:block;font-size:44px;line-height:1;font-weight:800;color:#B8730F;}
+.sheet .rk2 b small{font-size:19px;color:#8B6A45;font-weight:700;margin-right:8px;direction:ltr;display:inline-block;}
+.sheet .rk2 span{font-size:15px;color:#7A6246;}
+.sheet .sd-tiles{display:grid;grid-template-columns:1fr 1fr;gap:26px 10px;margin-top:40px;width:200px;text-align:center;}
+.sheet .sd-tiles b{display:block;font-size:40px;line-height:1;font-weight:800;color:#B8730F;}
+.sheet .sd-tiles span{font-size:15px;color:#7A6246;}
+.sheet .sd-line{display:block;width:4px;flex:1;min-height:80px;background:#FFAA5A;margin-top:36px;border-radius:2px;}
+.sheet .rs-main{padding:52px 0 26px;display:flex;flex-direction:column;min-width:0;}
+.sheet .rs-bar{display:block;width:34px;height:4px;background:#FFAA5A;border-radius:2px;margin-bottom:22px;}
+.sheet .rs-top{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;color:#8B7355;}
+.sheet .rs-top b{color:#2A1B10;font-size:13px;}
+.sheet .rs-title{font-size:21px;color:#6B5640;margin-top:8px;font-weight:700;}
+.sheet .rs-who{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;}
+.sheet .rs-name{font-size:44px;line-height:1.15;color:#B8730F;margin:0;font-weight:800;letter-spacing:-.5px;}
+.sheet .rs-tags{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+.sheet .rs-tags span{padding:6px 16px;border-radius:99px;background:#F1E6D6;color:#5A4430;font-size:13.5px;font-weight:700;}
+.sheet .rs-ph{width:104px;height:104px;border-radius:50%;object-fit:cover;border:4px solid #fff;box-shadow:0 0 0 2px #E9D5B6;flex:none;}
+.sheet .rs-al{margin-top:14px;padding:9px 16px;border-radius:14px;background:#FDE4E7;color:#C23049;font-size:13.5px;font-weight:700;}
+.sheet .rs-h{display:flex;align-items:center;gap:8px;font-size:21px;font-weight:800;margin:32px 0 16px;}
+.sheet .rs-h::before{content:"";width:6px;height:24px;border-radius:3px;background:#FFAA5A;}
+.sheet .rs-cr{display:grid;grid-template-columns:1fr 1fr;column-gap:30px;row-gap:16px;}
+.sheet .rs-c{--c:#CBB9A0;}.sheet .c-ok{--c:#2FBF8A;}.sheet .c-warn{--c:#F5A031;}.sheet .c-bad{--c:#F0506E;}
+.sheet .rs-c .t{display:flex;justify-content:space-between;align-items:baseline;font-size:15.5px;font-weight:700;margin-bottom:7px;}
+.sheet .rs-c .t b{font-size:15px;color:var(--c);}
+.sheet .seg3{display:flex;gap:4px;}.sheet .seg3 i{flex:1;height:10px;border-radius:99px;background:#E9DCC9;}.sheet .seg3 i.on{background:var(--c);}
+.sheet .rs-ins{display:flex;gap:12px;margin-top:20px;}
+.sheet .rs-ins div{flex:1;border-radius:18px;padding:14px 16px;font-size:13px;}
+.sheet .rs-ins b{display:block;font-size:17px;margin-top:3px;font-weight:800;}
+.sheet .rs-ins .up{background:#DFF3E8;color:#1D7A55;}.sheet .rs-ins .dn{background:#FBE8CE;color:#B06A0F;}
+.sheet .rs-none{padding:16px;border-radius:16px;background:#F1E6D6;color:#7A6246;text-align:center;font-weight:700;}
+.sheet .rs-t{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;}
+.sheet .rs-t th{background:#2A1B12;color:#fff;font-size:14px;padding:10px 14px;text-align:right;font-weight:800;}
+.sheet .rs-t th:first-child{border-radius:0 14px 14px 0;}.sheet .rs-t th:last-child{border-radius:14px 0 0 14px;}
+.sheet .rs-t td{padding:12px 14px;font-size:14px;border-bottom:1.5px dashed #E4D3BB;color:#3A2A1B;text-align:right;vertical-align:top;overflow-wrap:anywhere;}
+.sheet .rs-t td.mut{color:#8B7355;}
+.sheet .rs-sign{display:flex;gap:44px;margin-top:auto;padding-top:48px;}
+.sheet .rs-sign div{flex:1;border-top:2px solid #2A1B10;text-align:center;padding-top:10px;font-weight:800;font-size:14px;}
+.sheet .rs-foot{text-align:center;font-size:11px;color:#A59278;letter-spacing:1px;margin-top:18px;direction:ltr;}
+
+.sheet .rs-t th{box-shadow:1px 0 0 #2A1B12;}
