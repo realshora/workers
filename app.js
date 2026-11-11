@@ -2,7 +2,8 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '7';
+const VER = '8';
+const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
 const CRIT = ['جودة الشغل','الإنتاجية','المعرفة الفنية','الالتزام والانضباط','السلامة والنظافة','الحفاظ على الخامات والمعدات','التعاون والسلوك','المبادرة والتطور'];
@@ -79,7 +80,7 @@ function parseWorkbook(wb) {
   if (dcell && typeof dcell.v === 'string' && dcell.v.trim()) month = dcell.v.trim();
   if (!month) {
     const firstDate = workers.flatMap(w => w.abs.concat(w.vio)).map(x => x.s)[0];
-    if (firstDate) { const p = XLSX.SSF.parse_date_code(firstDate); month = MONTHS[p.m - 1] + ' ' + p.y; }
+    if (firstDate) { const p = ymd(firstDate); month = MONTHS[p.m - 1] + ' ' + p.y; }
   }
   if (!workers.length) throw new Error('الملف مفيهوش عمال.');
   return { month, T, workers };
@@ -119,8 +120,9 @@ function toneOf(avg, T) {
 const scTone = v => v >= 4 ? 'ok' : v >= 3 ? 'warn' : 'bad';
 const byRank = (a, b) => (a.avg == null) - (b.avg == null) || (b.avg - a.avg) || (a.cntAbs - b.cntAbs) || a.name.localeCompare(b.name, 'ar');
 const fmt = v => v == null ? '—' : (Math.round(v * 100) / 100).toString();
-function fmtDate(s) { const p = XLSX.SSF.parse_date_code(s); const wd = new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(); return `${DAYS[wd]} ${p.d} ${MONTHS[p.m - 1]}`; }
-function shortDate(s) { const p = XLSX.SSF.parse_date_code(s); const wd = new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(); return `${DAYS[wd]} ${p.d}`; }
+const ymd = s => { const t = new Date(Math.round((s - 25569) * 86400000)); return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() }; };
+function fmtDate(s) { const p = ymd(s); const wd = new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(); return `${DAYS[wd]} ${p.d} ${MONTHS[p.m - 1]}`; }
+function shortDate(s) { const p = ymd(s); const wd = new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(); return `${DAYS[wd]} ${p.d}`; }
 
 function stats(list) {
   const ev = list.filter(w => w.avg != null);
@@ -257,17 +259,18 @@ function renderData() {
   if (!D) { el.innerHTML = emptyState(); return; }
   el.innerHTML = `<div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
-    <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button></div></div>
+    <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button><button class="btn ghost2" data-act="check">فحص ملفات التطبيق</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
-function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : ''; }
+function reportErr(e) { console.error(e); const b = document.getElementById('fixbtn'); if (b) { b.classList.remove('hide'); b.innerHTML = 'التطبيق مش بيفتح؟ دوس هنا للتحديث<br><small>' + esc(String(e && e.message || e)).slice(0, 90) + '</small>'; } }
+function renderAll() { [renderList, renderAtt, renderVio, renderRank, renderReports, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
   state.tab = t;
   ['list','att','vio','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rank:'ترتيب العمال', rep:'التقارير', data:'البيانات' }[t];
   $('#fab').classList.toggle('hide', t !== 'list');
-  if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, data: renderData })[t](); syncVioBar();
+  try { if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, data: renderData })[t](); } catch (e) { reportErr(e); } syncVioBar();
   window.scrollTo(0, 0);
 }
 
@@ -289,6 +292,7 @@ async function getBlob() {
   return cur.blob;
 }
 async function renderPng(node) {
+  if (typeof htmlToImage === 'undefined') throw new Error('ملف html-to-image.js مش مرفوع على GitHub. دوس فحص ملفات التطبيق في تبويب البيانات.');
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
   const w = node.offsetWidth, h = node.offsetHeight;
   const r = Math.min(3, 4096 / w, 5200 / h, Math.sqrt(7e6 / (w * h)));
@@ -303,7 +307,7 @@ function busy(on) { document.querySelectorAll('.act').forEach(b => b.disabled = 
 async function withBlob(fn) {
   busy(true);
   try { const b = await getBlob(); if (!b) throw new Error('empty'); await fn(b); }
-  catch (e) { console.error(e); toast('حصلت مشكلة في عمل الصورة، جرب تاني'); }
+  catch (e) { console.error(e); toast(e && e.message && e.message.startsWith('ملف') ? e.message : 'حصلت مشكلة في عمل الصورة، جرب تاني'); }
   finally { busy(false); }
 }
 function download(b) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cur.file + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
@@ -323,11 +327,18 @@ let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classLis
 /* ---------------- استيراد وتخزين ---------------- */
 function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
 const now = () => new Date().toLocaleString('en-GB', { hour12: false }).slice(0, 17);
+function sanitize(r) {
+  r.T = r.T || { ok: 4, follow: 3, alert: 2 }; r.month = String(r.month || ''); r.workers = (r.workers || []).filter(w => w && w.name);
+  r.workers.forEach(w => { w.name = String(w.name); w.section = String(w.section || 'بدون قسم'); w.status = String(w.status || '');
+    w.scores = Array.from({ length: 8 }, (_, k) => typeof (w.scores || [])[k] === 'number' ? w.scores[k] : null);
+    w.abs = (w.abs || []).filter(x => x && typeof x.s === 'number'); w.vio = (w.vio || []).filter(x => x && typeof x.s === 'number'); });
+  return r;
+}
 function rebuild() { if (!RAW) { D = null; return; } D = enrich(RAW); D.fileName = RAW.fileName; D.importedAt = RAW.importedAt; D.builtin = !!RAW.builtin; }
 function load() {
-  try { const r = localStorage.getItem(LS); if (r) RAW = JSON.parse(r); } catch (e) {}
-  if (!RAW && window.BUILTIN) { RAW = JSON.parse(JSON.stringify(window.BUILTIN)); RAW.builtin = true; }
-  rebuild();
+  try { const r = localStorage.getItem(LS); if (r) RAW = sanitize(JSON.parse(r)); } catch (e) { RAW = null; }
+  if (!RAW && window.BUILTIN) { RAW = sanitize(JSON.parse(JSON.stringify(window.BUILTIN))); RAW.builtin = true; }
+  try { rebuild(); } catch (e) { reportErr(e); RAW = null; if (window.BUILTIN) { RAW = sanitize(JSON.parse(JSON.stringify(window.BUILTIN))); RAW.builtin = true; rebuild(); } }
 }
 let skipRefresh = false;
 function commit(msg) {
@@ -348,6 +359,7 @@ async function importFile(file) {
       if (!raw || !Array.isArray(raw.workers)) throw new Error('الملف ده مش نسخة احتياطية صحيحة.');
       raw.T = raw.T || { ok: 4, follow: 3, alert: 2 };
     } else {
+      if (typeof XLSX === 'undefined') throw new Error('ملف xlsx.mini.min.js مش مرفوع على GitHub.');
       raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' })); raw.fileName = file.name;
     }
     raw.importedAt = now(); raw.builtin = false; RAW = raw;
@@ -535,6 +547,12 @@ function vioReportCard(iso) {
     <div class="sbody">${list.length ? list.map(x => `<div class="vio"><div class="v1"><span>${esc(x.w.name)}</span><span>${esc(x.v.action)}</span></div><b>${esc(x.v.type)}</b>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}<p>${esc(x.w.section)}</p></div>`).join('') : '<div class="good">مفيش مخالفات متسجلة في اليوم ده</div>'}${foot()}</div></div>`;
 }
 
+async function checkFiles() {
+  toast('بفحص الملفات...');
+  const miss = [];
+  await Promise.all(APP_FILES.map(async f => { try { const r = await fetch(f + '?chk=' + Date.now(), { cache: 'no-store' }); if (!r.ok) miss.push(f); } catch (e) { miss.push(f); } }));
+  alert(miss.length ? 'الملفات دي مش مرفوعة على GitHub:\n' + miss.join('\n') + '\n\nارفعها في نفس مكان index.html.' : 'كل ملفات التطبيق موجودة وتمام (' + APP_FILES.length + ' ملف).');
+}
 function deleteWorker(i) {
   const w = RAW.workers[i]; if (!w || !confirm(`تحذف ${w.name} نهائيًا؟`)) return;
   RAW.workers.splice(i, 1); skipRefresh = true; commit('اتحذف ' + w.name); skipRefresh = false;
@@ -573,6 +591,7 @@ document.addEventListener('click', e => {
   if (t.dataset.rsec != null) { state.rsec = t.dataset.rsec; return renderRank(); }
   if (t.dataset.act === 'import' || t.dataset.act === 'restore') return $('#file').click();
   if (t.dataset.act === 'add') return openEditor(-1);
+  if (t.dataset.act === 'check') return checkFiles();
   if (t.dataset.act === 'refreshapp') return window.hardRefresh && window.hardRefresh();
   if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); return toast('اتحفظت النسخة الاحتياطية'); }
   if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); } return; }
