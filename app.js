@@ -1,6 +1,8 @@
 (() => {
 'use strict';
-const $ = s => document.querySelector(s);
+const DUMMY = document.createElement('div');
+const $ = s => document.querySelector(s) || DUMMY;
+const VER = '7';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
 const CRIT = ['جودة الشغل','الإنتاجية','المعرفة الفنية','الالتزام والانضباط','السلامة والنظافة','الحفاظ على الخامات والمعدات','التعاون والسلوك','المبادرة والتطور'];
@@ -30,42 +32,6 @@ const I = {
 let D = null;           // البيانات بعد المعالجة
 let RAW = null;         // البيانات الخام اللي بتتعدّل
 let state = { tab:'list', q:'', sec:'', rsec:'' };
-
-function isSafePhoto(value) {
-  return typeof value === 'string' && value.length <= 300000 && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
-}
-function normalizeRaw(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.workers)) throw new Error('الملف مش نسخة احتياطية صالحة: قائمة العمال غير موجودة.');
-  const validSerial = value => {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n < 1 || n > 2958465) return false;
-    try { return !!XLSX.SSF.parse_date_code(n); } catch (_) { return false; }
-  };
-  const limit = (value, fallback) => {
-    const n = Number(value);
-    return Number.isFinite(n) && n >= 1 && n <= 5 ? n : fallback;
-  };
-  const srcT = raw.T && typeof raw.T === 'object' ? raw.T : {};
-  const T = { ok: limit(srcT.ok, 4), follow: limit(srcT.follow, 3), alert: limit(srcT.alert, 2) };
-  const workers = raw.workers.map((w, i) => {
-    if (!w || typeof w !== 'object' || Array.isArray(w)) throw new Error(`بيانات العامل رقم ${i + 1} غير صالحة.`);
-    const name = String(w.name ?? '').trim();
-    if (!name) throw new Error(`اسم العامل رقم ${i + 1} غير موجود؛ لم يتم استبدال البيانات.`);
-    const srcScores = Array.isArray(w.scores) ? w.scores : [];
-    const scores = Array.from({ length: 8 }, (_, k) => {
-      const v = srcScores[k];
-      if (v == null || v === '') return null;
-      const n = Number(v);
-      return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
-    });
-    const abs = (Array.isArray(w.abs) ? w.abs : []).filter(a => a && validSerial(a.s) && ['غياب', 'إذن', 'إجازة'].includes(String(a.t))).map(a => ({ s: Number(a.s), t: String(a.t) }));
-    const vio = (Array.isArray(w.vio) ? w.vio : []).filter(v => v && typeof v === 'object' && validSerial(v.s) && String(v.type ?? '').trim()).map(v => ({ s: Number(v.s), type: String(v.type).trim(), detail: String(v.detail ?? '').trim(), action: String(v.action ?? '').trim() }));
-    const worker = { name, section: String(w.section ?? '').trim() || 'بدون قسم', scores, status: String(w.status ?? ''), abs, vio };
-    if (isSafePhoto(w.photo)) worker.photo = w.photo;
-    return worker;
-  });
-  return { ...raw, month: String(raw.month ?? '').trim(), T, workers, fileName: String(raw.fileName ?? ''), importedAt: String(raw.importedAt ?? ''), builtin: !!raw.builtin };
-}
 
 /* ---------------- قراءة ملف الإكسل ---------------- */
 function parseWorkbook(wb) {
@@ -131,6 +97,7 @@ function enrich(raw) {
     w.cntPerm = w.abs.filter(a => a.t === 'إذن').length;
     w.cntLeave = w.abs.filter(a => a.t === 'إجازة').length;
     w.cntVio = w.vio.length;
+    w.prevAvg = w.hist && w.hist.length ? w.hist[w.hist.length - 1].avg : null;
     w.alerts = [];
     if (w.complete) { if (w.scores[0] <= d.T.alert) w.alerts.push(CRIT[0]); if (w.scores[4] <= d.T.alert) w.alerts.push(CRIT[4]); }
   });
@@ -190,14 +157,14 @@ const foot = () => `<div class="sfoot">AL-TAWHEED EGYPT</div>`;
 
 /* ---------------- بطاقة العامل ---------------- */
 function workerCard(w) {
-  const dayChips = w.abs.length ? `<div class="dchips">${w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${esc(a.t)}: ${shortDate(a.s)}</span>`).join('')}</div>` : `<div class="good">ملتزم بالحضور، مفيش غياب مسجل</div>`;
+  const dayChips = w.abs.length ? `<div class="dchips">${w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${shortDate(a.s)}</span>`).join('')}</div>` : `<div class="good">ملتزم بالحضور، مفيش غياب مسجل</div>`;
   const vio = w.vio.length ? w.vio.slice().sort((a, b) => a.s - b.s).map(v => `<div class="vio"><div class="v1"><span>${fmtDate(v.s)}</span><span>${esc(v.action)}</span></div><b>${esc(v.type)}</b>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div>`).join('') : `<div class="good">لا توجد مخالفات مسجلة</div>`;
   return `<div class="sc tone-${w.tone}">
     <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      <h2>${w.photo ? `<img class="worker-photo" src="${esc(w.photo)}" alt="صورة العامل">` : ''}${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
+      ${w.photo ? `<img class="hphoto" src="${w.photo}" alt="">` : ''}<h2>${esc(w.name)}</h2><div class="tags"><span class="tag">${esc(w.section)}</span>${w.status ? `<span class="tag">عامل ${esc(w.status)}</span>` : ''}</div>
       <div class="score"><b>${fmt(w.avg)}</b><span>من 5</span></div><span class="stamp">${TONE_LABEL[w.tone]}</span></div>
     <div class="sbody">
-      ${w.avg != null ? `<div class="duo"><div><b>${w.rank}</b><span>الترتيب العام من ${D.total}</span></div><div><b>${w.srank}</b><span>الترتيب في القسم من ${w.stotal}</span></div></div>` : ''}
+      ${w.avg != null ? `<div class="duo"><div><b>${w.rank}</b><span>الترتيب العام من ${D.total}</span></div><div><b>${w.srank}</b><span>الترتيب في القسم من ${w.stotal}</span></div></div>${w.prevAvg != null ? (() => { const df = Math.round((w.avg - w.prevAvg) * 100) / 100; return `<div class="trend tone-${df > 0 ? 'ok' : df < 0 ? 'bad' : 'none'}">التقييم السابق ${fmt(w.prevAvg)}، ${df > 0 ? 'ارتفع ' + fmt(df) : df < 0 ? 'انخفض ' + fmt(-df) : 'ثابت'}</div>`; })() : ''}` : ''}
       ${tiles([['غياب', w.cntAbs, w.cntAbs >= 3 ? 'hot' : ''], ['إذن', w.cntPerm], ['إجازة', w.cntLeave], ['مخالفات', w.cntVio, w.cntVio ? 'hot' : '']])}
       ${w.alerts.length ? `<div class="vio" style="margin-top:12px"><div class="v1"><span>تنبيه</span></div><b>درجة منخفضة في: ${w.alerts.join(' و ')}</b></div>` : ''}
       <div class="sh">التقييم التفصيلي</div>${w.complete ? critRows(w.scores, true) + insight(w.scores) : `<div class="good" style="background:var(--none-bg)">لم يتم إدخال تقييم هذا الشهر</div>`}
@@ -266,7 +233,7 @@ function renderList() {
   $('#q').addEventListener('input', e => { state.q = e.target.value; fillWL(D.workers.filter(w => (!state.sec || w.section === state.sec) && (!state.q.trim() || w.name.includes(state.q.trim())))); });
 }
 function fillWL(list) {
-  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" ><div class="av">${w.rank ?? '–'}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
+  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${w.rank ?? '–'}</div>`}<div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
 }
 function renderRank() {
   const el = $('#v-rank');
@@ -290,6 +257,7 @@ function renderData() {
   if (!D) { el.innerHTML = emptyState(); return; }
   el.innerHTML = `<div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
+    <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
 function renderAll() { renderList(); renderAtt(); renderVio(); renderRank(); renderReports(); renderData(); $('#month').textContent = D ? D.month : ''; }
@@ -309,101 +277,62 @@ function openPage(title, html, file, wid) {
   $('#ptitle').textContent = title;
   $('#shot').innerHTML = html;
   cur = { title, file, blob: null, wid: wid == null ? null : wid };
-  const workerPage = wid != null;
-  $('#editBtn').classList.toggle('hide', !workerPage);
-  $('#reevalBtn').classList.toggle('hide', !workerPage);
-  $('#deleteWorkerBtn').classList.toggle('hide', !workerPage);
+  $('#editBtn').classList.toggle('hide', wid == null); $('#wbtns').classList.toggle('hide', wid == null);
   $('#page').classList.add('show'); $('#actions').classList.remove('hide'); $('#page').scrollTop = 0;
   history.pushState({ p: 1 }, '');
   setTimeout(() => getBlob().catch(() => {}), 450);
 }
-function closePage() {
-  $('#page').classList.remove('show'); $('#actions').classList.add('hide');
-  $('#reevalBtn').classList.add('hide'); $('#deleteWorkerBtn').classList.add('hide'); cur = null;
-}
-async function renderImageBlob(node) {
-  if (document.fonts && document.fonts.ready) await document.fonts.ready;
-  let lastError = null;
-  for (const pixelRatio of [2, 1]) {
-    try {
-      const blob = await htmlToImage.toBlob(node, { pixelRatio, backgroundColor: '#1B0C03', cacheBust: false });
-      if (blob && blob.size && blob.size <= 24000000) return blob;
-      lastError = new Error('تعذر إنشاء صورة بالحجم المناسب');
-    } catch (e) { lastError = e; }
-  }
-  throw lastError || new Error('تعذر إنشاء الصورة');
-}
+function closePage() { $('#page').classList.remove('show'); $('#actions').classList.add('hide'); cur = null; }
 async function getBlob() {
-  const target = cur;
-  if (!target) throw new Error('no page');
-  if (!target.blob) target.blob = renderImageBlob($('#shot'));
-  try {
-    const blob = await target.blob;
-    if (!blob) throw new Error('empty image');
-    return blob;
-  } catch (e) {
-    target.blob = null;
-    throw e;
+  if (!cur) throw new Error('no page');
+  if (!cur.blob) { const mine = cur; mine.blob = renderPng($('#shot')).catch(err => { mine.blob = null; throw err; }); }
+  return cur.blob;
+}
+async function renderPng(node) {
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  const w = node.offsetWidth, h = node.offsetHeight;
+  const r = Math.min(3, 4096 / w, 5200 / h, Math.sqrt(7e6 / (w * h)));
+  let lastErr;
+  for (const ratio of [r, Math.min(r, 1.6), 1]) {
+    try { const b = await htmlToImage.toBlob(node, { pixelRatio: Math.max(ratio, .8), backgroundColor: '#1B0C03', cacheBust: false }); if (b && b.size > 1000) return b; }
+    catch (e) { lastErr = e; console.error(e); }
   }
+  throw lastErr || new Error('empty image');
 }
 function busy(on) { document.querySelectorAll('.act').forEach(b => b.disabled = on); }
 async function withBlob(fn) {
   busy(true);
-  try { const b = await getBlob(); await fn(b); }
-  catch (e) { console.error(e); toast('حصلت مشكلة في عمل الصورة، حاول مرة أخرى.'); }
+  try { const b = await getBlob(); if (!b) throw new Error('empty'); await fn(b); }
+  catch (e) { console.error(e); toast('حصلت مشكلة في عمل الصورة، جرب تاني'); }
   finally { busy(false); }
 }
-function download(b) {
-  const url = URL.createObjectURL(b), a = document.createElement('a');
-  a.href = url; a.download = (cur ? cur.file : 'تقرير العمال') + '.png';
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
-const doSave = () => withBlob(async b => { download(b); toast('تم تجهيز الصورة للتنزيل. راجع مجلد التنزيلات.'); });
+function download(b) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cur.file + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+const doSave = () => withBlob(async b => { download(b); toast('الصورة اتحفظت (في التحميلات)'); });
 const doShare = () => withBlob(async b => {
-  const file = new File([b], (cur ? cur.file : 'تقرير العمال') + '.png', { type: 'image/png' });
-  if (navigator.share) {
-    try {
-      const data = { files: [file], title: cur ? cur.title : 'تقرير العمال' };
-      if (!navigator.canShare || navigator.canShare(data)) { await navigator.share(data); return; }
-    } catch (e) { if (e && e.name === 'AbortError') return; }
-  }
-  download(b); toast('تم حفظ الصورة. أرفقها يدوياً في واتساب من مجلد التنزيلات.');
+  const f = new File([b], cur.file + '.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) {
+    try { await navigator.share({ files: [f], title: cur.title }); } catch (e) { if (e && e.name !== 'AbortError') throw e; }
+  } else { download(b); toast('الصورة اتحفظت، ابعتها من الواتساب'); window.open('https://wa.me/', '_blank'); }
 });
 const doCopy = () => withBlob(async b => {
-  try {
-    if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) throw new Error('clipboard image unsupported');
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
-    toast('الصورة اتنسخت، الصقها في المحادثة.');
-  } catch (e) { toast('نسخ الصور غير متاح في هذا المتصفح؛ استخدم حفظ الصورة.'); }
+  try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('الصورة اتنسخت، الصقها في أي محادثة'); }
+  catch (e) { toast('المتصفح مش سامح بنسخ الصورة، استخدم حفظ'); }
 });
-let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('show'), 3200); }
+let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('show'), 2600); }
 
 /* ---------------- استيراد وتخزين ---------------- */
-function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); return true; } catch (e) { return false; } }
+function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
 const now = () => new Date().toLocaleString('en-GB', { hour12: false }).slice(0, 17);
-let loadWarning = '';
 function rebuild() { if (!RAW) { D = null; return; } D = enrich(RAW); D.fileName = RAW.fileName; D.importedAt = RAW.importedAt; D.builtin = !!RAW.builtin; }
 function load() {
-  let stored = null;
-  try { stored = localStorage.getItem(LS); } catch (e) { loadWarning = 'تعذر قراءة بيانات الجهاز؛ تم فتح القائمة الأصلية.'; }
-  if (stored) {
-    try { RAW = normalizeRaw(JSON.parse(stored)); }
-    catch (e) {
-      try { localStorage.setItem(LS + '_recovery', stored); localStorage.removeItem(LS); } catch (_) {}
-      RAW = null; loadWarning = 'البيانات المحفوظة غير سليمة؛ تم فتح القائمة الأصلية والاحتفاظ بمحاولة استعادة البيانات.';
-    }
-  }
-  if (!RAW && window.BUILTIN) { RAW = normalizeRaw(JSON.parse(JSON.stringify(window.BUILTIN))); RAW.builtin = true; }
+  try { const r = localStorage.getItem(LS); if (r) RAW = JSON.parse(r); } catch (e) {}
+  if (!RAW && window.BUILTIN) { RAW = JSON.parse(JSON.stringify(window.BUILTIN)); RAW.builtin = true; }
   rebuild();
 }
 let skipRefresh = false;
 function commit(msg) {
   RAW.builtin = false; RAW.fileName = RAW.fileName || 'تعديل داخل التطبيق'; RAW.importedAt = now();
-  const persisted = save(RAW);
-  rebuild(); renderAll(); if (!skipRefresh) refreshPage();
-  if (!persisted) toast('التعديل ظاهر مؤقتاً لكن لم يُحفظ على الجهاز. صدّر نسخة احتياطية أو أفرغ مساحة.');
-  else if (msg) toast(msg);
-  return persisted;
+  save(RAW); rebuild(); renderAll(); if (!skipRefresh) refreshPage(); if (msg) toast(msg);
 }
 function refreshPage() {
   if (!cur || cur.wid == null) return;
@@ -414,14 +343,15 @@ function refreshPage() {
 async function importFile(file) {
   try {
     let raw;
-    if (/\.json$/i.test(file.name)) raw = JSON.parse(await file.text());
-    else raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' }));
-    raw = normalizeRaw(raw);
-    if (RAW && !confirm('استيراد هذا الملف سيستبدل قائمة العمال والسجلات الحالية. احفظ نسخة احتياطية أولاً إذا احتجت إليها. هل تريد المتابعة؟')) return;
-    raw.fileName = raw.fileName || file.name; raw.importedAt = now(); raw.builtin = false;
-    if ($('#editor').classList.contains('show')) closeEditor();
-    if ($('#page').classList.contains('show')) closePage();
-    RAW = raw; resetDailyUi(); state.q = ''; state.sec = ''; state.rsec = '';
+    if (/\.json$/i.test(file.name)) {
+      raw = JSON.parse(await file.text());
+      if (!raw || !Array.isArray(raw.workers)) throw new Error('الملف ده مش نسخة احتياطية صحيحة.');
+      raw.T = raw.T || { ok: 4, follow: 3, alert: 2 };
+    } else {
+      raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' })); raw.fileName = file.name;
+    }
+    raw.importedAt = now(); raw.builtin = false; RAW = raw;
+    state.q = ''; state.sec = ''; state.rsec = '';
     commit(`تم التحديث: ${RAW.workers.length} عامل`); setTab('list');
   } catch (e) { console.error(e); toast(e.message || 'مقدرتش أقرا الملف'); }
 }
@@ -430,92 +360,55 @@ async function importFile(file) {
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isoToSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569; };
 let ed = null;
-function openEditor(i, reeval = false) {
+function openEditor(i, mode) {
   const base = i >= 0 ? RAW.workers[i] : { name: '', section: '', scores: Array(8).fill(null), status: '', abs: [], vio: [] };
-  ed = { i, w: JSON.parse(JSON.stringify(base)) };
-  if (reeval && i >= 0) ed.w.scores = Array(8).fill(null);
-  const w = ed.w, uniq = f => [...new Set(RAW.workers.flatMap(x => f(x)).filter(Boolean))];
+  ed = { i, mode: mode || '', w: JSON.parse(JSON.stringify(base)) };
+  const w = ed.w, hd = ed.mode === 'reeval' ? ' hide' : '', uniq = f => [...new Set(RAW.workers.flatMap(x => f(x)).filter(Boolean))];
   const dl = (id, arr) => `<datalist id="${id}">${arr.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
-  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : reeval ? 'إعادة تقييم ' + esc(w.name) : 'تعديل ' + esc(w.name)}</h2></div>
+  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : (ed.mode === 'reeval' ? 'إعادة تقييم ' : 'تعديل ') + esc(w.name)}</h2></div>
   <div class="ebody">
-    <div class="fs"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
+    <div class="fs${hd}"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
       <label>القسم<input id="eSec" list="dlSecs" value="${esc(w.section)}" placeholder="اختار قسم أو اكتب قسم جديد" autocomplete="off"></label>
-      <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div>
-      <div class="photo-pick"><div id="photoPreview" class="photo-preview"></div><div class="photo-controls"><label>الصورة الشخصية (اختياري)<input id="ePhoto" type="file" accept="image/*"></label><button type="button" class="btn ghost2 hide" id="removePhoto" data-e="removePhoto">إزالة الصورة</button></div></div></div>
-    <div class="fs"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
-    <div class="fs"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}">
+      <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
+    <div class="fs" id="sScores"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
+    <div class="fs${hd}"><h3>صورة العامل</h3><div class="phrow"><div class="phbox" id="phBox">${w.photo ? `<img src="${w.photo}" alt="">` : 'بدون صورة'}</div><div><label class="btn ghost2 sm" for="phFile">اختيار صورة</label><input type="file" id="phFile" accept="image/*" hidden><button class="btn danger sm" data-e="rmphoto">حذف الصورة</button></div></div></div>
+    <div class="fs${hd}"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}">
       <div class="seg2"><button data-e="abs" data-v="غياب">غياب</button><button data-e="abs" data-v="إذن">إذن</button><button data-e="abs" data-v="إجازة">إجازة</button></div><div id="absList"></div></div>
-    <div class="fs"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
+    <div class="fs${hd}"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
       <button class="btn" data-e="addvio" style="margin-top:10px">إضافة المخالفة</button><div id="vioList"></div></div>
-    ${i >= 0 ? '<button class="btn danger" data-e="del" style="width:100%">حذف العامل</button>' : ''}
+    ${i >= 0 && !ed.mode ? '<button class="btn danger" data-e="del" style="width:100%">حذف العامل</button>' : ''}
   </div>
   ${dl('dlSecs', uniq(x => [x.section]))}${dl('dlTypes', uniq(x => x.vio.map(v => v.type)))}${dl('dlActs', uniq(x => x.vio.map(v => v.action)))}
   <div class="actions"><div class="inner"><button class="act main" data-e="save">حفظ</button><button class="act" data-e="cancel">إلغاء</button></div></div>`;
-  paintEd(); absList(); vioList(); paintPhotoPreview();
+  paintEd(); absList(); vioList();
   $('#editor').classList.add('show'); $('#editor').scrollTop = 0; history.pushState({ e: 1 }, '');
+  if (ed.mode === 'reeval') $('#editor').scrollTop = 0;
 }
 function closeEditor() { $('#editor').classList.remove('show'); ed = null; }
-function paintPhotoPreview() {
-  const box = $('#photoPreview'); if (!box || !ed) return;
-  box.innerHTML = ed.w.photo ? `<img src="${esc(ed.w.photo)}" alt="معاينة صورة العامل">` : I.user;
-  $('#removePhoto').classList.toggle('hide', !ed.w.photo);
-}
-function resizePhoto(file) {
-  return new Promise((resolve, reject) => {
-    if (!file || !file.type.startsWith('image/')) return reject(new Error('اختار ملف صورة صالح.'));
-    if (file.size > 15000000) return reject(new Error('حجم الصورة كبير؛ اختار صورة أصغر من 15 ميجابايت.'));
-    const url = URL.createObjectURL(file), img = new Image();
-    const cleanup = () => URL.revokeObjectURL(url);
-    img.onerror = () => { cleanup(); reject(new Error('تعذر قراءة الصورة.')); };
-    img.onload = () => {
-      try {
-        const max = 360, scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-          cleanup();
-          if (!blob) return reject(new Error('تعذر ضغط الصورة.'));
-          const reader = new FileReader();
-          reader.onerror = () => reject(new Error('تعذر حفظ الصورة.'));
-          reader.onload = () => {
-            const data = String(reader.result || '');
-            if (!isSafePhoto(data)) return reject(new Error('تعذر تجهيز الصورة بحجم مناسب.'));
-            resolve(data);
-          };
-          reader.readAsDataURL(blob);
-        }, 'image/jpeg', 0.72);
-      } catch (e) { cleanup(); reject(e); }
-    };
-    img.src = url;
-  });
-}
-function deleteWorker(i, fromEditor = false) {
-  const w = RAW && RAW.workers[i];
-  if (!w) return toast('العامل غير موجود.');
-  if (!confirm(`تحذف ${w.name} نهائيًا؟`)) return;
-  RAW.workers.splice(i, 1); resetDailyUi();
-  if (!fromEditor) closePage();
-  skipRefresh = true; commit('اتحذف العامل'); skipRefresh = false;
-  if (fromEditor) {
-    history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
-  } else history.back();
-}
 function paintEd() {
   document.querySelectorAll('#eStatus button').forEach(b => b.classList.toggle('on', b.dataset.v === ed.w.status));
   document.querySelectorAll('.nums button').forEach(b => b.classList.toggle('on', ed.w.scores[+b.dataset.k] === +b.dataset.v));
 }
 function absList() {
-  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${esc(a.t)}: ${fmtDate(a.s)}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
+  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
 }
 function vioList() {
   $('#vioList').innerHTML = ed.w.vio.map((v, n) => `<div class="ve"><div><b>${esc(v.type)}</b><br><small>${fmtDate(v.s)}${v.action ? '، ' + esc(v.action) : ''}</small>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div><button data-e="rmvio" data-n="${n}">×</button></div>`).join('');
 }
+function shrink(file, size = 260) {
+  return new Promise((res, rej) => { const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => { const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size; c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size); URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg', .82)); };
+    img.onerror = rej; img.src = u; });
+}
+$('#editor').addEventListener('change', async e => {
+  if (e.target.id !== 'phFile' || !ed || !e.target.files[0]) return;
+  try { ed.w.photo = await shrink(e.target.files[0]); $('#phBox').innerHTML = `<img src="${ed.w.photo}" alt="">`; } catch (err) { toast('مقدرتش أقرا الصورة'); }
+});
 $('#editor').addEventListener('click', e => {
   const t = e.target.closest('[data-e]'); if (!t || !ed) return;
   const k = t.dataset.e, v = t.dataset.v;
   if (k === 'cancel') return history.back();
-  if (k === 'removePhoto') { ed.w.photo = ''; paintPhotoPreview(); return; }
+  if (k === 'rmphoto') { delete ed.w.photo; $('#phBox').textContent = 'بدون صورة'; return; }
   if (k === 'status') { ed.w.status = ed.w.status === v ? '' : v; return paintEd(); }
   if (k === 'score') { const kk = +t.dataset.k; ed.w.scores[kk] = ed.w.scores[kk] === +v ? null : +v; return paintEd(); }
   if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v }); absList(); return toast(`اتسجل ${v}`); }
@@ -523,32 +416,29 @@ $('#editor').addEventListener('click', e => {
   if (k === 'addvio') { const type = $('#vType').value.trim(), d = $('#vDate').value; if (!type || !d) return toast('اكتب نوع المخالفة والتاريخ'); ed.w.vio.push({ s: isoToSerial(d), type, detail: $('#vDet').value.trim(), action: $('#vAct').value.trim() }); ['vType','vDet','vAct'].forEach(id => $('#' + id).value = ''); vioList(); return toast('اتسجلت المخالفة'); }
   if (k === 'rmvio') { ed.w.vio.splice(+t.dataset.n, 1); return vioList(); }
   if (k === 'save') {
-    const name = $('#eName').value.trim(), sec = $('#eSec').value.trim();
+    const name = ed.mode === 'reeval' ? ed.w.name : $('#eName').value.trim(), sec = ed.mode === 'reeval' ? ed.w.section : $('#eSec').value.trim();
     if (!name) return toast('اكتب اسم العامل');
     if (!sec) return toast('اختار القسم');
     if (RAW.workers.some((x, j) => j !== ed.i && x.name.trim() === name)) return toast('فيه عامل بنفس الاسم ده');
     ed.w.name = name; ed.w.section = sec;
+    const old = ed.i >= 0 ? RAW.workers[ed.i] : null;
+    if (old && old.scores.every(x => x != null) && ed.w.scores.some((x, k) => x !== old.scores[k])) {
+      const oa = Math.round(old.scores.reduce((p, q) => p + q, 0) / 8 * 100 + 1e-7) / 100;
+      ed.w.hist = (old.hist || []).concat({ d: todayISO(), avg: oa }).slice(-12);
+    }
     if (ed.i < 0) RAW.workers.push(ed.w); else RAW.workers[ed.i] = ed.w;
     const isNew = ed.i < 0; commit(isNew ? 'اتضاف العامل' : 'اتحفظت التعديلات'); return history.back();
   }
-  if (k === 'del') return deleteWorker(ed.i, true);
-});
-$('#editor').addEventListener('change', async e => {
-  if (e.target.id !== 'ePhoto' || !ed) return;
-  const file = e.target.files && e.target.files[0]; if (!file) return;
-  try { ed.w.photo = await resizePhoto(file); paintPhotoPreview(); toast('اتحفظت الصورة داخل بطاقة العامل.'); }
-  catch (err) { toast(err.message || 'تعذر تحميل الصورة.'); }
-  e.target.value = '';
+  if (k === 'del' && confirm(`تحذف ${ed.w.name} نهائيًا؟`)) {
+    RAW.workers.splice(ed.i, 1); skipRefresh = true; commit('اتحذف العامل'); skipRefresh = false;
+    history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
+  }
 });
 document.addEventListener('change', e => { if (e.target.id === 'monthIn') { const m = e.target.value.trim(); if (m) { RAW.month = m; commit('اتحدّث الشهر'); } } });
 
 /* ---------------- الحضور والمخالفات اليومية ---------------- */
 const att = { iso: todayISO(), type: 'غياب', sec: '', q: '' };
 const vst = { iso: todayISO(), sel: new Set(), sec: '', q: '', type: '', detail: '', action: '' };
-function resetDailyUi() {
-  att.iso = todayISO(); att.type = 'غياب'; att.sec = ''; att.q = '';
-  vst.iso = todayISO(); vst.sel.clear(); vst.sec = ''; vst.q = ''; vst.type = ''; vst.detail = ''; vst.action = '';
-}
 const shiftISO = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`; };
 const dsel = (key, iso) => `<div class="dsel"><button data-dd="${key}:-1" aria-label="اليوم السابق">${I.back}</button><label><input type="date" data-dk="${key}" value="${iso}"><b>${fmtDate(isoToSerial(iso))}</b><small>${iso === todayISO() ? 'النهارده' : 'دوس هنا لتغيير التاريخ'}</small></label><button data-dd="${key}:1" class="flip" aria-label="اليوم التالي">${I.back}</button></div>`;
 const dayStatus = (w, s) => { const a = w.abs.find(x => x.s === s); return a ? a.t : ''; };
@@ -556,24 +446,26 @@ const secChips = (attr, cur) => `<div class="chips"><button class="fchip ${cur ?
 
 function renderAtt() {
   const el = $('#v-att'); if (!D) { el.innerHTML = emptyState(); return; }
-  if (!D.workers.length) { el.innerHTML = `<div class="card info"><h3>لا توجد أسماء عمال</h3><p>أضف العمال من تبويب العمال أو استورد قائمة Excel، ثم ارجع لتسجيل الحضور والغياب.</p><button class="btn" data-tab="list">الذهاب إلى العمال</button></div>`; return; }
-  const verb = { 'غياب': 'غايبين', 'إذن': 'واخدين إذن', 'إجازة': 'في إجازة' }[att.type];
+  const s = isoToSerial(att.iso), cnt = { 'غياب': 0, 'إذن': 0, 'إجازة': 0 };
+  D.workers.forEach(w => { const t = dayStatus(w, s); if (t) cnt[t]++; });
+  const tn = { 'غياب': 'bad', 'إذن': 'warn', 'إجازة': 'none' }, day = att.iso === todayISO() ? 'النهارده' : fmtDate(s);
   el.innerHTML = `${dsel('att', att.iso)}
-    <div class="seg2">${['غياب', 'إذن', 'إجازة'].map(t => `<button data-at="${t}" class="${att.type === t ? 'on' : ''}">${t}</button>`).join('')}</div>
-    <div class="hint">اختار التاريخ ونوع الحالة، ثم ابحث عن اسم العامل واضغط عليه لتسجيل ${verb}. الضغط مرة ثانية يلغي التسجيل لهذا اليوم.</div>
-    <div class="stats" id="attSum"></div>
-    <label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل لتسجيل الحالة" value="${esc(att.q)}" autocomplete="off"></label>
+    <div class="tcards">${['غياب', 'إذن', 'إجازة'].map(t => `<button class="tcard tone-${tn[t]} ${att.type === t ? 'on' : ''}" data-at="${t}"><b>${cnt[t]}</b><span>${t} ${att.iso === todayISO() ? 'اليوم' : ''}</span></button>`).join('')}</div>
+    <div class="hint">حاليًا بتسجّل <b>${att.type}</b> ${day}: دوس على اسم العامل من القايمة تحت. دوسة تانية بتشيله. باقي العمال بيتحسبوا حاضرين (${D.workers.length - cnt['غياب'] - cnt['إذن'] - cnt['إجازة']} حاضر).</div>
+    <div class="h2" id="attRecTitle"></div><div class="dchips" id="attChips" style="margin-bottom:12px"></div>
+    <label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
     ${secChips('data-asec', att.sec)}<div class="list" id="attRows"></div>
-    <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي</button>`;
+    <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي (صورة)</button>`;
   fillAtt(); $('#aq').addEventListener('input', e => { att.q = e.target.value; fillAtt(); });
 }
 function fillAtt() {
-  const s = isoToSerial(att.iso), q = att.q.trim(), cnt = { 'غياب': 0, 'إذن': 0, 'إجازة': 0 };
-  D.workers.forEach(w => { const t = dayStatus(w, s); if (t) cnt[t]++; });
-  $('#attSum').innerHTML = `<span class="tone-ok">حاضر<b>${D.workers.length - cnt['غياب'] - cnt['إذن'] - cnt['إجازة']}</b></span><span class="tone-bad">غياب<b>${cnt['غياب']}</b></span><span class="tone-warn">إذن<b>${cnt['إذن']}</b></span><span class="tone-none">إجازة<b>${cnt['إجازة']}</b></span>`;
+  const s = isoToSerial(att.iso), q = att.q.trim(), tn = { 'غياب': 'bad', 'إذن': 'warn', 'إجازة': 'none' };
+  const rec = D.workers.filter(w => dayStatus(w, s) === att.type);
+  $('#attRecTitle').textContent = rec.length ? `المسجلين ${att.type} (${rec.length})` : `لسه مفيش حد متسجل ${att.type}`;
+  $('#attChips').innerHTML = rec.map(w => `<button class="dchip tone-${tn[att.type]}" data-aw="${w.id}">${esc(w.name)} ×</button>`).join('');
   const list = D.workers.filter(w => (!att.sec || w.section === att.sec) && (!q || w.name.includes(q)));
-  $('#attRows').innerHTML = list.map(w => { const t = dayStatus(w, s), tone = t === 'غياب' ? 'bad' : t === 'إذن' ? 'warn' : t ? 'none' : 'ok';
-    return `<button class="arow tone-${tone} ${t ? 'is' : ''}" data-aw="${w.id}"><div class="chk">${t ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="stp">${esc(t || 'حاضر')}</div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
+  $('#attRows').innerHTML = list.map(w => { const t = dayStatus(w, s), tone = t ? tn[t] : 'ok';
+    return `<button class="arow tone-${tone} ${t ? 'is' : ''}" data-aw="${w.id}"><div class="chk">${t ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="stp">${t || 'حاضر'}</div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
 }
 function tapAtt(id) {
   const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s);
@@ -583,7 +475,6 @@ function tapAtt(id) {
 
 function renderVio() {
   const el = $('#v-vio'); if (!D) { el.innerHTML = emptyState(); return; }
-  if (!D.workers.length) { el.innerHTML = `<div class="card info"><h3>لا توجد أسماء عمال</h3><p>أضف العمال من تبويب العمال أو استورد قائمة Excel، ثم ارجع لتسجيل المخالفات.</p><button class="btn" data-tab="list">الذهاب إلى العمال</button></div>`; syncVioBar(); return; }
   const s = isoToSerial(vst.iso), log = [];
   D.workers.forEach(w => w.vio.forEach((v, n) => { if (v.s === s) log.push({ w, v, n }); }));
   const uniq = f => [...new Set(D.workers.flatMap(w => w.vio.map(f)).filter(Boolean))];
@@ -591,10 +482,10 @@ function renderVio() {
   el.innerHTML = `${dsel('vio', vst.iso)}
     <div class="h2">مخالفات اليوم (${log.length})</div>
     ${log.length ? log.map(x => `<div class="ve"><div><b>${esc(x.w.name)}</b><br><small>${esc(x.v.type)}${x.v.action ? '، ' + esc(x.v.action) : ''}</small>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}</div><button data-vd="${x.w.id}:${x.n}">×</button></div>`).join('') : '<div class="card info"><p>مفيش مخالفات متسجلة في اليوم ده.</p></div>'}
-    <div class="h2">مخالفة جديدة</div>
+    <div class="h2">١. اكتب المخالفة</div>
     <div class="card info vform"><input id="vt" list="dlT" placeholder="نوع المخالفة" value="${esc(vst.type)}" autocomplete="off"><textarea id="vd" rows="2" placeholder="التفاصيل">${esc(vst.detail)}</textarea><input id="va" list="dlA" placeholder="الإجراء، مثال: إنذار شفهي" value="${esc(vst.action)}" autocomplete="off"></div>${dl('dlT', uniq(v => v.type))}${dl('dlA', uniq(v => v.action))}
-    <div class="h2">اختار اسم العامل أو أكثر ممن ارتكبوا المخالفة</div>
-    <label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل لتحديده" value="${esc(vst.q)}" autocomplete="off"></label>
+    <div class="h2">٢. اختار العمال اللي عملوا المخالفة</div>
+    <label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل" value="${esc(vst.q)}" autocomplete="off"></label>
     ${secChips('data-vsec', vst.sec)}<div class="list" id="vioRows"></div>
     <button class="btn" data-act="viorep" style="width:100%;margin-top:14px">تقرير المخالفات اليومي</button>`;
   fillVio();
@@ -613,10 +504,10 @@ function syncVioBar() {
   $('#vioBar').classList.toggle('hide', !show); $('#vioGo').textContent = `سجّل المخالفة لـ ${n} عامل`;
 }
 function registerVio() {
-  const type = vst.type.trim(), s = isoToSerial(vst.iso), ids = [...vst.sel].filter(id => RAW.workers[id]), n = ids.length;
-  if (!n) { vst.sel.clear(); syncVioBar(); return toast('اختار عامل على الأقل'); }
+  const type = vst.type.trim(), s = isoToSerial(vst.iso), n = vst.sel.size;
+  if (!n) return toast('اختار عامل على الأقل');
   if (!type) return toast('اكتب نوع المخالفة');
-  ids.forEach(id => RAW.workers[id].vio.push({ s, type, detail: vst.detail.trim(), action: vst.action.trim() }));
+  vst.sel.forEach(id => RAW.workers[id].vio.push({ s, type, detail: vst.detail.trim(), action: vst.action.trim() }));
   vst.sel.clear(); vst.type = vst.detail = vst.action = '';
   commit(`اتسجلت المخالفة لـ ${n} عامل`); syncVioBar();
 }
@@ -644,8 +535,15 @@ function vioReportCard(iso) {
     <div class="sbody">${list.length ? list.map(x => `<div class="vio"><div class="v1"><span>${esc(x.w.name)}</span><span>${esc(x.v.action)}</span></div><b>${esc(x.v.type)}</b>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}<p>${esc(x.w.section)}</p></div>`).join('') : '<div class="good">مفيش مخالفات متسجلة في اليوم ده</div>'}${foot()}</div></div>`;
 }
 
+function deleteWorker(i) {
+  const w = RAW.workers[i]; if (!w || !confirm(`تحذف ${w.name} نهائيًا؟`)) return;
+  RAW.workers.splice(i, 1); skipRefresh = true; commit('اتحذف ' + w.name); skipRefresh = false;
+  if (cur && cur.wid != null) history.back();
+}
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],#vioGo,#vioClear');
+  const w2 = e.target.closest('[data-w2]');
+  if (w2 && cur && cur.wid != null) { const k = w2.dataset.w2; return k === 'reeval' ? openEditor(cur.wid, 'reeval') : k === 'edit' ? openEditor(cur.wid) : deleteWorker(cur.wid); }
+  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],#vioGo');
   if (!t || !D) return;
   const d = t.dataset;
   if (d.aw != null) return tapAtt(+d.aw);
@@ -654,8 +552,7 @@ document.addEventListener('click', e => {
   if (d.at) { att.type = d.at; return renderAtt(); }
   if (d.asec != null) { att.sec = d.asec; return renderAtt(); }
   if (d.vsec != null) { vst.sec = d.vsec; return renderVio(); }
-  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); if (RAW.workers[id]) RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
-  if (t.id === 'vioClear') { vst.sel.clear(); fillVio(); return syncVioBar(); }
+  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
   if (t.id === 'vioGo') return registerVio();
   if (d.act === 'attrep') return openPage('تقرير الحضور', attReportCard(att.iso), `حضور ${fmtDate(isoToSerial(att.iso))}`);
   if (d.act === 'viorep') return openPage('تقرير المخالفات', vioReportCard(vst.iso), `مخالفات ${fmtDate(isoToSerial(vst.iso))}`);
@@ -670,30 +567,30 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab],[data-w],[data-r],[data-sec],[data-rsec],[data-act]');
   if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
-  if (t.dataset.w != null) { const w = D && D.workers[+t.dataset.w]; if (!w) return toast('ملف العامل غير متاح؛ حدّث القائمة وجرب مرة أخرى.'); return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`, w.id); }
+  if (t.dataset.w != null) { const w = D.workers[+t.dataset.w]; return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`, w.id); }
   if (t.dataset.r != null) { const s = t.dataset.r; return openPage(s ? 'تقرير ' + s : 'تقرير التجهيز', reportCard(s || null), `تقرير ${s || 'قسم التجهيز'} - ${D.month}`); }
   if (t.dataset.sec != null && t.closest('#v-list')) { state.sec = t.dataset.sec; return renderList(); }
   if (t.dataset.rsec != null) { state.rsec = t.dataset.rsec; return renderRank(); }
   if (t.dataset.act === 'import' || t.dataset.act === 'restore') return $('#file').click();
   if (t.dataset.act === 'add') return openEditor(-1);
+  if (t.dataset.act === 'refreshapp') return window.hardRefresh && window.hardRefresh();
   if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); return toast('اتحفظت النسخة الاحتياطية'); }
-  if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); vst.sel.clear(); commit('بدأ الشهر الجديد'); } return; }
-  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); RAW = null; resetDailyUi(); load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
+  if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); } return; }
+  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); RAW = null; load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
 });
 $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; });
 $('#back').addEventListener('click', () => history.back());
 window.addEventListener('popstate', () => { if ($('#editor').classList.contains('show')) closeEditor(); else closePage(); });
 $('#fab').addEventListener('click', () => openEditor(-1));
 $('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
-$('#reevalBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid, true); });
-$('#deleteWorkerBtn').addEventListener('click', () => { if (cur && cur.wid != null) deleteWorker(cur.wid, false); });
 $('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
 $('#back').innerHTML = I.back; $('.gear').innerHTML = I.gear; $('#vioGo').textContent = '';
 $('#bSave').insertAdjacentHTML('afterbegin', I.dl); $('#bWa').insertAdjacentHTML('afterbegin', I.wa); $('#bCopy').insertAdjacentHTML('afterbegin', I.copy);
 document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afterbegin', I[b.dataset.icon]));
 
-load(); renderAll(); setTab('list'); if (loadWarning) toast(loadWarning);
+load(); renderAll(); setTab('list');
+window.__booted = true;
 window.__app = { get D() { return D; }, parseWorkbook, enrich };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

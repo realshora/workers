@@ -3,34 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>عمال التجهيز</title>
+<title>ملفات العمال</title>
 <meta name="theme-color" content="#1B0C03">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
-<div id="splash"><div class="sp-top"><img src="logo-emblem.png" alt="التوحيد إيجيبت"><small>مرحباً بك في</small><h1>ملفات العمال</h1><p>كل عامل في ملف واحد، وترتيب العمال وتقارير الأقسام في إيدك.</p></div><div class="sp-art"></div>
-<button id="go" type="button" aria-label="ابدأ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6M6 19l6-6 6 6"/></svg>ابدأ</button></div>
 <script>
-(()=>{
-  const splash=document.getElementById('splash'),button=document.getElementById('go');
-  if(!splash||!button)return;
-  const enter=()=>{
-    if(splash.dataset.leaving==='1'||splash.classList.contains('hide'))return;
-    splash.dataset.leaving='1';
-    splash.classList.add('out');
-    window.setTimeout(()=>splash.classList.add('hide'),650);
-    try{sessionStorage.setItem('twh_in','1')}catch(_){}
-  };
-  try{if(sessionStorage.getItem('twh_in'))splash.classList.add('hide')}catch(_){}
-  button.addEventListener('click',enter);
-  button.addEventListener('pointerup',e=>{if(e.pointerType==='touch'){e.preventDefault();enter()}});
-  button.addEventListener('touchend',e=>{e.preventDefault();enter()},{passive:false});
-})();
+window.hardRefresh=async function(){try{var rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(function(r){return r.unregister()}));var ks=await caches.keys();await Promise.all(ks.map(function(k){return caches.delete(k)}));}catch(e){}location.reload();};
 </script>
+<button id="fixbtn" class="hide" onclick="hardRefresh()">التطبيق مش بيفتح؟ دوس هنا للتحديث</button>
+<div id="splash"><div class="sp-top"><img src="logo-emblem.png" alt="التوحيد إيجيبت"><small>مرحباً بك في</small><h1>ملفات العمال</h1><p>كل عامل في ملف واحد، وترتيب العمال وتقارير الأقسام في إيدك.</p></div><div class="sp-art"></div>
+<button id="go" aria-label="ابدأ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14l6-6 6 6M6 19l6-6 6 6"/></svg>ابدأ</button></div>
 <header class="top"><div class="logo"><img src="logo-emblem.png" alt=""></div><div><h1 id="title">عمال التجهيز</h1><small id="month"></small></div><button class="gear" data-tab="data" aria-label="البيانات"></button></header>
 <main class="wrap">
   <section id="v-list"></section>
@@ -47,10 +34,11 @@
   <button data-tab="rank" data-icon="trophy"><span>الترتيب</span></button>
   <button data-tab="rep" data-icon="doc"><span>التقارير</span></button>
 </nav>
-<div id="vioBar" class="hide"><button class="btn ghost2" id="vioClear">إلغاء التحديد</button><button class="btn" id="vioGo"></button></div>
+<div id="vioBar" class="hide"><button class="btn" id="vioGo"></button></div>
 <div class="page" id="page">
-  <div class="pbar"><button class="back" id="back" aria-label="رجوع"></button><h2 id="ptitle"></h2><div class="ptools"><button class="paction hide" id="reevalBtn">إعادة تقييم</button><button class="paction danger hide" id="deleteWorkerBtn">حذف</button><button class="back hide" id="editBtn" aria-label="تعديل"></button></div></div>
-  <div class="pbody"><div id="shot" style="padding:14px;background:#1B0C03"></div></div>
+  <div class="pbar"><button class="back" id="back" aria-label="رجوع"></button><h2 id="ptitle"></h2><button class="back hide" id="editBtn" aria-label="تعديل" style="margin-right:auto"></button></div>
+  <div class="pbody"><div id="shot" style="padding:14px;background:#1B0C03"></div>
+  <div id="wbtns" class="wbtns hide"><button class="btn" data-w2="reeval">إعادة تقييم</button><button class="btn ghost2" data-w2="edit">تعديل</button><button class="btn danger" data-w2="del">حذف</button></div></div>
 </div>
 <div class="page" id="editor" style="z-index:70"></div>
 <button id="fab" aria-label="إضافة عامل" data-act="add">+</button>
@@ -61,9 +49,15 @@
 </div></div>
 <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.json" hidden>
 <div class="toast" id="toast"></div>
+<script>
+(function(){var sp=document.getElementById('splash'),go=document.getElementById('go');
+try{if(sessionStorage.getItem('twh_in'))sp.classList.add('hide');}catch(e){}
+go.addEventListener('click',function(){sp.classList.add('out');try{sessionStorage.setItem('twh_in','1');}catch(e){}setTimeout(function(){sp.classList.add('hide');},650);});
+setTimeout(function(){if(!window.__booted)document.getElementById('fixbtn').classList.remove('hide');},3000);})();
+</script>
 <script src="vendor/xlsx.mini.min.js"></script>
 <script src="vendor/html-to-image.js"></script>
-<script src="data.js"></script>
-<script src="app.js"></script>
+<script src="data.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-// خدمة التخزين المؤقت: التطبيق يفتح فورًا ويشتغل من غير نت، ويتحدث في الخلفية
-const CACHE = 'twh-workers-v9';
-const FILES = ['./','./index.html','./style.css','./app.js','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./art.svg','./data.js','./logo-emblem.png',
+// التطبيق بيجيب آخر نسخة من النت الأول، ولو مفيش نت بيشتغل من النسخة المحفوظة
+const CACHE = 'twh-workers-v7';
+const FILES = ['./','./index.html','./style.css','./app.js','./data.js','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./art.svg','./logo-emblem.png',
   './vendor/xlsx.mini.min.js','./vendor/html-to-image.js',
   './fonts/tajawal-arabic-500-normal.woff2','./fonts/tajawal-arabic-700-normal.woff2','./fonts/tajawal-arabic-800-normal.woff2',
   './fonts/tajawal-latin-500-normal.woff2','./fonts/tajawal-latin-700-normal.woff2','./fonts/tajawal-latin-800-normal.woff2'];
@@ -11,9 +11,11 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url); if (url.origin !== location.origin) return;
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(req, { ignoreSearch: true });
-    const refresh = fetch(req).then(async r => { if (r && r.ok) await cache.put(req, r.clone()); return r; }).catch(() => null);
-    if (cached) { e.waitUntil(refresh); return cached; }
-    return (await refresh) || (await cache.match('./index.html')) || Response.error();
+    const net = fetch(req, { cache: 'no-cache' }).then(r => { if (r && r.ok) cache.put(req, r.clone()); return r; });
+    const slow = new Promise(res => setTimeout(() => res(null), 4000));
+    try { const r = await Promise.race([net, slow]); if (r) return r; } catch (_) {}
+    const c = await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' ? await cache.match('./index.html') : null);
+    if (c) return c;
+    try { return await net; } catch (_) { return Response.error(); }
   })());
 });
