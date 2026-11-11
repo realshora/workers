@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '9';
+const VER = '10';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -157,77 +157,76 @@ function insight(vals) {
 const tiles = arr => `<div class="tiles">${arr.map(t => `<div class="tile ${t[2] || ''}"><b>${t[1]}</b><span>${t[0]}</span></div>`).join('')}</div>`;
 const foot = () => `<div class="sfoot">AL-TAWHEED EGYPT</div>`;
 
-/* ---------------- بطاقة العامل ---------------- */
-function workerCard(w) {
-  const cc = v => v == null ? 'none' : v >= 4 ? 'ok' : v >= 3 ? 'warn' : 'bad';
-  const crit = CRIT.map((n, k) => { const v = w.scores[k]; return `<div class="rs-c c-${cc(v)}"><div class="t"><span>${n}</span><b>${v == null ? '—' : v}</b></div><div class="seg3">${[1, 2, 3, 4, 5].map(x => `<i class="${v != null && x <= v ? 'on' : ''}"></i>`).join('')}</div></div>`; }).join('');
-  let ins = '';
-  if (w.complete) {
-    const mx = Math.max(...w.scores), mn = Math.min(...w.scores);
-    ins = mx === mn ? `<div class="rs-ins"><div class="up">مستوى متوازن في كل الجوانب<b>${mx} من 5</b></div></div>` : `<div class="rs-ins"><div class="up">أقوى نقطة<b>${CRIT[w.scores.indexOf(mx)]}</b></div><div class="dn">محتاج تحسين<b>${CRIT[w.scores.indexOf(mn)]}</b></div></div>`;
-  }
-  const abs = w.abs.slice().sort((x, y) => x.s - y.s);
-  const absRows = abs.length ? abs.map(x => `<tr><td>${fmtDate(x.s)}</td><td>${x.t}</td><td class="mut">${esc(x.r || '—')}</td></tr>`).join('') : '<tr><td colspan="3" class="mut" style="text-align:center">لا يوجد غياب أو إذن أو إجازة</td></tr>';
-  const vio = w.vio.slice().sort((x, y) => x.s - y.s);
-  const vioRows = vio.length ? vio.map(x => `<tr><td>${fmtDate(x.s)}</td><td>${esc(x.type)}${x.detail ? ': ' + esc(x.detail) : ''}</td><td class="mut">${esc(x.action || '—')}</td></tr>`).join('') : '<tr><td colspan="3" class="mut" style="text-align:center">لا توجد مخالفات مسجلة</td></tr>';
-  let prev = '';
-  if (w.prevAvg != null && w.avg != null) { const df = Math.round((w.avg - w.prevAvg) * 100) / 100; prev = `<div class="sd-prev">التقييم السابق ${fmt(w.prevAvg)}، ${df > 0 ? 'ارتفع ' + fmt(df) : df < 0 ? 'انخفض ' + fmt(-df) : 'ثابت'}</div>`; }
-  const ev = w.avg != null;
-  return `<div class="fit"><div class="sheet tone-${w.tone}">
+/* ---------------- قالب التقارير الموحّد (ورقة A4) ---------------- */
+const TC = { ok: '#2FBF8A', warn: '#F5A031', bad: '#F0506E', none: '#CBB9A0' };
+const cTone = v => v == null ? 'none' : v >= 4 ? 'ok' : v >= 3 ? 'warn' : 'bad';
+function sheetFrame(o) {
+  const nm = String(o.name || '');
+  return `<div class="fit"><div class="sheet tone-${o.tone}">
     <aside class="sd"><div class="sd-top"><div class="sd-logo"><img src="logo-emblem.png" alt=""></div><h3>التوحيد إيجيبت</h3><small>AL-TAWHEED EGYPT</small>
-      <div class="sd-score"><b>${fmt(w.avg)}</b><span>من 5</span></div><span class="sd-pill">${TONE_LABEL[w.tone]}</span>${prev}</div>
-      <div class="rk2"><b>${ev ? w.rank : '—'}${ev ? `<small>${D.total} /</small>` : ''}</b><span>الترتيب العام</span></div>
-      <div class="rk2"><b>${ev ? w.srank : '—'}${ev ? `<small>${w.stotal} /</small>` : ''}</b><span>الترتيب في القسم</span></div>
-      <div class="sd-tiles"><div><b>${w.cntAbs}</b><span>غياب</span></div><div><b>${w.cntPerm}</b><span>إذن</span></div><div><b>${w.cntLeave}</b><span>إجازة</span></div><div><b>${w.cntVio}</b><span>مخالفات</span></div></div><i class="sd-line"></i></aside>
-    <main class="rs-main"><i class="rs-bar"></i><div class="rs-top"><span>قسم التجهيز</span><b>${esc(D.month)}</b></div><div class="rs-title">تقرير تقييم الأداء الشهري</div>
-      <div class="rs-who"><div><h1 class="rs-name">${esc(w.name)}</h1><div class="rs-tags"><span>${esc(w.section)}</span>${w.status ? `<span>عامل ${esc(w.status)}</span>` : ''}</div></div>${w.photo ? `<img class="rs-ph" src="${w.photo}" alt="">` : ''}</div>
-      ${w.alerts.length ? `<div class="rs-al">تنبيه: درجة منخفضة في ${w.alerts.join(' و ')}</div>` : ''}
-      <div class="rs-h">التقييم التفصيلي</div>${w.complete ? `<div class="rs-cr">${crit}</div>${ins}` : '<div class="rs-none">لم يتم إدخال تقييم هذا الشهر</div>'}
-      <div class="rs-h">سجل الغياب والإذن والإجازات</div><table class="rs-t"><colgroup><col style="width:34%"><col style="width:20%"><col></colgroup><thead><tr><th>التاريخ</th><th>النوع</th><th>السبب</th></tr></thead><tbody>${absRows}</tbody></table>
-      <div class="rs-h">المخالفات</div><table class="rs-t"><colgroup><col style="width:30%"><col><col style="width:22%"></colgroup><thead><tr><th>التاريخ</th><th>سبب المخالفة</th><th>الإجراء</th></tr></thead><tbody>${vioRows}</tbody></table>
+      <div class="sd-score"><b>${o.score}</b><span>${o.unit}</span></div><span class="sd-pill">${o.pill}</span>${o.sub || ''}</div>
+      ${(o.ranks || []).map(r => `<div class="rk2"><b>${r.v}${r.s ? `<small>${r.s}</small>` : ''}</b><span>${r.l}</span></div>`).join('')}
+      <div class="sd-tiles">${o.tiles.map(t => `<div><b>${t[0]}</b><span>${t[1]}</span></div>`).join('')}</div><i class="sd-line"></i></aside>
+    <main class="rs-main"><i class="rs-bar"></i><div class="rs-top"><span>قسم التجهيز</span><b>${esc(D.month)}</b></div><div class="rs-title">${o.title}</div>
+      <div class="rs-who"><div><h1 class="rs-name${nm.length > 17 ? ' sm' : ''}">${esc(nm)}</h1><div class="rs-tags">${(o.tags || []).filter(Boolean).map(t => `<span>${esc(t)}</span>`).join('')}</div></div>${o.photo ? `<img class="rs-ph" src="${o.photo}" alt="">` : ''}</div>
+      ${o.alert ? `<div class="rs-al">${o.alert}</div>` : ''}
+      ${o.body}
       <div class="rs-sign"><div>مسؤول القسم</div><div>مدير الإنتاج</div></div><div class="rs-foot">AL-TAWHEED EGYPT</div>
     </main></div></div>`;
 }
-
-/* ---------------- بطاقة تقرير القسم / الكل ---------------- */
-function miniRow(w, showSec, inSec) {
-  const r = inSec ? w.srank : w.rank;
-  const g = r && r <= 3 ? ' g' + r : '';
-  return `<div class="mini tone-${w.tone}"><div class="rk${g}">${r ?? '—'}</div><div class="mm"><b>${esc(w.name)}</b>${showSec ? `<small style="color:var(--muted);font-size:12px">${esc(w.section)}</small>` : ''}<div class="bar"><i style="width:${w.avg == null ? 0 : w.avg / 5 * 100}%"></i></div></div><em>${fmt(w.avg)}</em></div>`;
+const H = t => `<div class="rs-h">${t}</div>`;
+const tr = cells => `<tr>${cells.map(c => typeof c === 'object' ? `<td class="${c.c || ''}">${c.h}</td>` : `<td>${c}</td>`).join('')}</tr>`;
+const tbl = (cols, rows, empty) => `<table class="rs-t"><colgroup>${cols.map(c => `<col${c[1] ? ` style="width:${c[1]}"` : ''}>`).join('')}</colgroup><thead><tr>${cols.map(c => `<th${c[2] ? ` class="${c[2]}"` : ''}>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${cols.length}" class="mut" style="text-align:center">${empty || '—'}</td></tr>`}</tbody></table>`;
+const critGrid = (vals, cont) => `<div class="rs-cr">${CRIT.map((n, k) => { const v = vals[k], t = cTone(v);
+  const bar = cont ? `<div class="bc"><i style="width:${v == null ? 0 : v / 5 * 100}%"></i></div>` : `<div class="seg3">${[1, 2, 3, 4, 5].map(x => `<i class="${v != null && x <= v ? 'on' : ''}"></i>`).join('')}</div>`;
+  return `<div class="rs-c c-${t}"><div class="t"><span>${n}</span><b>${v == null ? '—' : fmt(Math.round(v * 10) / 10)}</b></div>${bar}</div>`; }).join('')}</div>`;
+function rsIns(vals, l1, l2) {
+  const ok = vals.map((v, i) => [v, i]).filter(x => x[0] != null); if (!ok.length) return '';
+  const mx = ok.reduce((p, q) => q[0] > p[0] ? q : p), mn = ok.reduce((p, q) => q[0] < p[0] ? q : p);
+  return mx[0] === mn[0] ? `<div class="rs-ins"><div class="up">مستوى متوازن في كل الجوانب<b>${fmt(Math.round(mx[0] * 10) / 10)} من 5</b></div></div>` : `<div class="rs-ins"><div class="up">${l1}<b>${CRIT[mx[1]]}</b></div><div class="dn">${l2}<b>${CRIT[mn[1]]}</b></div></div>`;
 }
+const distBar = st => { const ks = ['ok', 'warn', 'bad', 'none'].filter(k => st.dec[k]);
+  return ks.length ? `<div class="rs-dist">${ks.map(k => `<i style="flex:${st.dec[k]};background:${TC[k]}"></i>`).join('')}</div><div class="rs-leg">${ks.map(k => `<span style="--lc:${TC[k]}">${TONE_LABEL[k]} (${st.dec[k]})</span>`).join('')}</div>` : ''; };
+
+/* ---------------- تقرير العامل ---------------- */
+function workerCard(w) {
+  const abs = w.abs.slice().sort((x, y) => x.s - y.s), vio = w.vio.slice().sort((x, y) => x.s - y.s), ev = w.avg != null;
+  let prev = '';
+  if (w.prevAvg != null && ev) { const df = Math.round((w.avg - w.prevAvg) * 100) / 100; prev = `<div class="sd-prev">التقييم السابق ${fmt(w.prevAvg)}، ${df > 0 ? 'ارتفع ' + fmt(df) : df < 0 ? 'انخفض ' + fmt(-df) : 'ثابت'}</div>`; }
+  return sheetFrame({ tone: w.tone, score: fmt(w.avg), unit: 'من 5', pill: TONE_LABEL[w.tone], sub: prev,
+    ranks: [{ v: ev ? w.rank : '—', s: ev ? D.total + ' /' : '', l: 'الترتيب العام' }, { v: ev ? w.srank : '—', s: ev ? w.stotal + ' /' : '', l: 'الترتيب في القسم' }],
+    tiles: [[w.cntAbs, 'غياب'], [w.cntPerm, 'إذن'], [w.cntLeave, 'إجازة'], [w.cntVio, 'مخالفات']],
+    title: 'تقرير تقييم الأداء الشهري', name: w.name, tags: [w.section, w.status ? 'عامل ' + w.status : ''], photo: w.photo,
+    alert: w.alerts.length ? 'تنبيه: درجة منخفضة في ' + w.alerts.join(' و ') : '',
+    body: H('التقييم التفصيلي') + (w.complete ? critGrid(w.scores, false) + rsIns(w.scores, 'أقوى نقطة', 'محتاج تحسين') : '<div class="rs-none">لم يتم إدخال تقييم هذا الشهر</div>')
+      + H('سجل الغياب والإذن والإجازات') + tbl([['التاريخ', '34%'], ['النوع', '20%'], ['السبب']], abs.map(x => tr([fmtDate(x.s), x.t, { h: esc(x.r || '—'), c: 'mut' }])), 'لا يوجد غياب أو إذن أو إجازة')
+      + H('المخالفات') + tbl([['التاريخ', '30%'], ['سبب المخالفة'], ['الإجراء', '22%']], vio.map(x => tr([fmtDate(x.s), esc(x.type) + (x.detail ? ': ' + esc(x.detail) : ''), { h: esc(x.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة') });
+}
+
+/* ---------------- تقرير القسم / القسم كله ---------------- */
 function reportCard(sec) {
   const list = sec ? D.workers.filter(w => w.section === sec) : D.workers;
-  const st = stats(list), tone = toneOf(st.avg);
-  const hue = sec ? HUES[D.sections.indexOf(sec) % HUES.length] : '#4F46E5';
-  const sorted = list.slice().sort(byRank);
-  const best = sorted.find(w => w.avg != null);
-  const total = st.n || 1;
-  const dist = ['ok','warn','bad','none'].filter(k => st.dec[k]).map(k => `<i style="flex:${st.dec[k]};background:var(--${k === 'none' ? 'none' : k})"></i>`).join('');
-  const legend = ['ok','warn','bad','none'].filter(k => st.dec[k]).map(k => `<span style="--lc:var(--${k})">${TONE_LABEL[k]} (${st.dec[k]})</span>`).join('');
+  const st = stats(list), tone = toneOf(st.avg), sorted = list.slice().sort(byRank), best = sorted.find(w => w.avg != null);
   const needs = list.filter(w => w.alerts.length || w.cntVio || w.cntAbs >= 3).sort(byRank);
-  const needsHtml = needs.length ? needs.map(w => `<div class="vio"><div class="v1"><span>${esc(w.name)}</span><span>${fmt(w.avg)}</span></div><b>${[w.alerts.length ? 'درجة منخفضة: ' + w.alerts.join(' و ') : '', w.cntVio ? 'مخالفات: ' + w.cntVio : '', w.cntAbs >= 3 ? 'غياب: ' + w.cntAbs + ' أيام' : ''].filter(Boolean).join(' · ')}</b></div>`).join('') : `<div class="good">مفيش تنبيهات ولا مخالفات</div>`;
-  let middle;
-  if (sec) middle = `<div class="sh">ترتيب العمال</div>${sorted.map(w => miniRow(w, false, true)).join('')}`;
+  const needRows = needs.map(w => tr([esc(w.name), { h: [w.alerts.length ? 'درجة منخفضة: ' + w.alerts.join(' و ') : '', w.cntVio ? 'مخالفات: ' + w.cntVio : '', w.cntAbs >= 3 ? 'غياب: ' + w.cntAbs + ' أيام' : ''].filter(Boolean).join('، '), c: 'mut' }]));
+  const rk = w => sec ? w.srank : w.rank;
+  const wRow = (w, withSec) => tr([{ h: rk(w) ?? '—', c: 'n' }, esc(w.name)].concat(withSec ? [esc(w.section)] : []).concat([{ h: fmt(w.avg), c: 'n' }].concat(withSec ? [] : [{ h: w.cntAbs, c: 'n' }, { h: w.cntVio, c: 'n' }])));
+  let body = H('متوسط الجوانب') + critGrid(st.crit, true) + rsIns(st.crit, 'أقوى جانب', 'أضعف جانب') + H('قرارات التقييم') + distBar(st);
+  if (sec) body += H('ترتيب العمال') + tbl([['#', '10%', 'n'], ['العامل'], ['المتوسط', '16%', 'n'], ['غياب', '14%', 'n'], ['مخالفات', '16%', 'n']], sorted.map(w => wRow(w, false)));
   else {
+    const secs = D.sections.map(s => { const l = D.workers.filter(w => w.section === s); return { s, st: stats(l) }; }).sort((x, y) => (y.st.avg ?? -1) - (x.st.avg ?? -1));
     const ev = sorted.filter(w => w.avg != null);
-    const secs = D.sections.map(s => { const l = D.workers.filter(w => w.section === s); return { s, st: stats(l), hue: HUES[D.sections.indexOf(s) % HUES.length] }; }).sort((a, b) => (b.st.avg ?? -1) - (a.st.avg ?? -1));
-    middle = `<div class="sh">مقارنة الأقسام</div>${secs.map(x => `<div class="mini tone-${toneOf(x.st.avg)}"><div class="mm"><b>${esc(x.s)} <small style="color:var(--muted);font-weight:500">(${x.st.n} عمال)</small></b><div class="bar"><i style="width:${x.st.avg == null ? 0 : x.st.avg / 5 * 100}%;background:${x.hue}"></i></div></div><em style="color:var(--ink)">${fmt(x.st.avg)}</em></div>`).join('')}
-      <div class="sh">الأعلى تقييماً</div>${ev.slice(0, 5).map(w => miniRow(w, true)).join('')}
-      <div class="sh">الأقل تقييماً</div>${ev.slice(-5).reverse().map(w => miniRow(w, true)).join('')}`;
+    body += H('مقارنة الأقسام') + tbl([['القسم'], ['العمال', '12%', 'n'], ['المتوسط', '15%', 'n'], ['مؤهل', '12%', 'n'], ['غياب', '12%', 'n'], ['مخالفات', '14%', 'n']], secs.map(x => tr([esc(x.s), { h: x.st.n, c: 'n' }, { h: fmt(x.st.avg), c: 'n' }, { h: x.st.dec.ok, c: 'n' }, { h: x.st.abs, c: 'n' }, { h: x.st.vio, c: 'n' }])))
+      + H('الأعلى تقييمًا') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '28%'], ['المتوسط', '16%', 'n']], ev.slice(0, 5).map(w => wRow(w, true)))
+      + H('الأقل تقييمًا') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '28%'], ['المتوسط', '16%', 'n']], ev.slice(-5).reverse().map(w => wRow(w, true)));
   }
-  return `<div class="sc tone-${tone}">
-    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      <h2>${sec ? 'تقرير قسم ' + esc(sec) : 'تقرير قسم التجهيز'}</h2><div class="tags"><span class="tag">${st.n} عامل</span></div>
-      <div class="score"><b>${fmt(st.avg)}</b><span>من 5</span></div><span class="stamp">متوسط ${sec ? 'القسم' : 'التجهيز'}</span></div>
-    <div class="sbody">
-      ${best ? `<div class="duo"><div><b>${fmt(best.avg)}</b><span>الأعلى تقييماً: ${esc(best.name)}</span></div><div><b>${st.dec.ok}</b><span>مؤهل ويكمل من ${st.n}</span></div></div>` : ''}
-      <div class="dist">${dist}</div><div class="legend">${legend}</div>
-      ${tiles([['غياب', st.abs], ['إذن', st.perm], ['إجازة', st.leave], ['مخالفات', st.vio, st.vio ? 'hot' : '']])}
-      <div class="sh">متوسط الجوانب</div>${critRows(st.crit)}${insight(st.crit)}
-      ${middle}
-      <div class="sh">تنبيهات ومتابعة</div>${needsHtml}
-      ${foot()}
-    </div></div>`;
+  body += H('تنبيهات ومتابعة') + tbl([['العامل', '34%'], ['الملاحظة']], needRows, 'لا توجد تنبيهات أو مخالفات');
+  return sheetFrame({ tone, score: fmt(st.avg), unit: 'من 5', pill: sec ? 'متوسط القسم' : 'متوسط التجهيز',
+    sub: best ? `<div class="sd-prev">الأعلى: ${esc(best.name)} (${fmt(best.avg)})</div>` : '',
+    ranks: [{ v: st.n, l: 'عدد العمال' }, { v: st.dec.ok, s: st.n + ' /', l: 'مؤهل ويكمل' }],
+    tiles: [[st.abs, 'غياب'], [st.perm, 'إذن'], [st.leave, 'إجازة'], [st.vio, 'مخالفات']],
+    title: sec ? 'تقرير أداء القسم الشهري' : 'تقرير الأداء الشهري لقسم التجهيز', name: sec ? 'قسم ' + sec : 'قسم التجهيز كامل',
+    tags: [st.n + ' عامل', sec ? '' : D.sections.length + ' أقسام', st.dec.none ? st.dec.none + ' لم يُقيَّم' : ''], body });
 }
 
 /* ---------------- الشاشات الرئيسية ---------------- */
@@ -551,27 +550,28 @@ function registerVio() {
 
 function attReportCard(iso) {
   const s = isoToSerial(iso), total = D.workers.length, by = t => D.workers.filter(w => dayStatus(w, s) === t);
-  const A = by('غياب'), P = by('إذن'), L = by('إجازة'), present = total - A.length - P.length - L.length;
-  const block = (title, list, tone) => list.length ? `<div class="sh">${title} (${list.length})</div>${D.sections.filter(sec => list.some(w => w.section === sec)).map(sec => `<div class="grp"><small>${esc(sec)}</small><div class="dchips">${list.filter(w => w.section === sec).map(w => `<span class="dchip tone-${tone}">${esc(w.name)}</span>`).join('')}</div></div>`).join('')}` : '';
-  return `<div class="sc tone-${A.length ? 'warn' : 'ok'}">
-    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      <h2>تقرير الحضور اليومي</h2><div class="tags"><span class="tag">${fmtDate(s)}</span></div>
-      <div class="score"><b>${present}</b><span>حاضر من ${total}</span></div><span class="stamp">${A.length ? 'غياب ' + A.length : 'الكل حاضر'}</span></div>
-    <div class="sbody">${tiles([['غياب', A.length, A.length ? 'hot' : ''], ['إذن', P.length], ['إجازة', L.length], ['حاضر', present]])}
-      ${block('غياب', A, 'bad')}${block('إذن', P, 'warn')}${block('إجازة', L, 'none')}
-      ${A.length + P.length + L.length ? '' : '<div class="good" style="margin-top:16px">كل العمال حاضرين</div>'}${foot()}</div></div>`;
+  const A = by('غياب'), P = by('إذن'), L = by('إجازة'), present = total - A.length - P.length - L.length, pct = total ? Math.round(present / total * 100) : 0;
+  const secRows = D.sections.map(sec => { const l = D.workers.filter(w => w.section === sec), c = t => l.filter(w => dayStatus(w, s) === t).length, a1 = c('غياب'), p1 = c('إذن'), l1 = c('إجازة');
+    return tr([esc(sec), { h: l.length - a1 - p1 - l1, c: 'n' }, { h: a1, c: 'n' }, { h: p1, c: 'n' }, { h: l1, c: 'n' }]); });
+  const lst = (title, arr) => arr.length ? H(`${title} (${arr.length})`) + tbl([['العامل'], ['القسم', '30%'], ['السبب', '28%']], arr.map(w => tr([esc(w.name), esc(w.section), { h: esc((w.abs.find(x => x.s === s) || {}).r || '—'), c: 'mut' }]))) : '';
+  const body = H('الحضور حسب القسم') + tbl([['القسم'], ['حاضر', '14%', 'n'], ['غياب', '14%', 'n'], ['إذن', '14%', 'n'], ['إجازة', '14%', 'n']], secRows)
+    + lst('الغياب', A) + lst('الإذن', P) + lst('الإجازات', L) + (A.length + P.length + L.length ? '' : '<div class="rs-ok">كل العمال حاضرين</div>');
+  return sheetFrame({ tone: A.length ? 'warn' : 'ok', score: present, unit: 'حاضر من ' + total, pill: A.length ? 'غياب ' + A.length : 'الكل حاضر',
+    ranks: [{ v: pct + '%', l: 'نسبة الحضور' }, { v: total, l: 'إجمالي العمال' }], tiles: [[A.length, 'غياب'], [P.length, 'إذن'], [L.length, 'إجازة'], [present, 'حاضر']],
+    title: 'تقرير الحضور اليومي', name: fmtDate(s), tags: [total + ' عامل'], body });
 }
 function vioReportCard(iso) {
   const s = isoToSerial(iso), list = [];
   D.workers.forEach(w => w.vio.forEach(v => { if (v.s === s) list.push({ w, v }); }));
-  const people = new Set(list.map(x => x.w.id)).size;
-  return `<div class="sc tone-${list.length ? 'bad' : 'ok'}">
-    <div class="hero"><i class="tape"></i><div class="hrow"><span><img src="logo-emblem.png" alt="">التوحيد إيجيبت</span><span class="mon">${esc(D.month)}</span></div>
-      <h2>تقرير المخالفات اليومي</h2><div class="tags"><span class="tag">${fmtDate(s)}</span></div>
-      <div class="score"><b>${list.length}</b><span>مخالفة</span></div><span class="stamp">${list.length ? people + ' عامل' : 'مفيش مخالفات'}</span></div>
-    <div class="sbody">${list.length ? list.map(x => `<div class="vio"><div class="v1"><span>${esc(x.w.name)}</span><span>${esc(x.v.action)}</span></div><b>${esc(x.v.type)}</b>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}<p>${esc(x.w.section)}</p></div>`).join('') : '<div class="good">مفيش مخالفات متسجلة في اليوم ده</div>'}${foot()}</div></div>`;
+  const people = new Set(list.map(x => x.w.id)).size, monthTotal = D.workers.reduce((p, w) => p + w.cntVio, 0), monthPeople = D.workers.filter(w => w.cntVio).length;
+  const types = {}; list.forEach(x => { types[x.v.type] = (types[x.v.type] || 0) + 1; });
+  const noAct = list.filter(x => !x.v.action).length;
+  const body = H('مخالفات اليوم') + tbl([['العامل', '24%'], ['القسم', '20%'], ['المخالفة'], ['الإجراء', '20%']], list.map(x => tr([esc(x.w.name), esc(x.w.section), esc(x.v.type) + (x.v.detail ? ': ' + esc(x.v.detail) : ''), { h: esc(x.v.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة في اليوم ده')
+    + (list.length ? H('حسب النوع') + tbl([['نوع المخالفة'], ['العدد', '18%', 'n']], Object.keys(types).map(k => tr([esc(k), { h: types[k], c: 'n' }]))) : '');
+  return sheetFrame({ tone: list.length ? 'bad' : 'ok', score: list.length, unit: 'مخالفة', pill: list.length ? people + ' عامل' : 'مفيش مخالفات',
+    ranks: [{ v: monthTotal, l: 'مخالفات الشهر' }, { v: monthPeople, l: 'عمال لهم مخالفات' }], tiles: [[list.length, 'مخالفات اليوم'], [people, 'عمال'], [Object.keys(types).length, 'أنواع'], [noAct, 'بدون إجراء']],
+    title: 'تقرير المخالفات اليومي', name: fmtDate(s), tags: [D.workers.length + ' عامل'], body });
 }
-
 async function checkFiles() {
   toast('بفحص الملفات...');
   const miss = [];

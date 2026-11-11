@@ -244,3 +244,14 @@ input{font-family:inherit;} b{font-weight:800;} .hide{display:none!important;}
 .sheet .rs-foot{text-align:center;font-size:11px;color:#A59278;letter-spacing:1px;margin-top:18px;direction:ltr;}
 
 .sheet .rs-t th{box-shadow:1px 0 0 #2A1B12;}
+
+.sheet .rs-name.sm{font-size:36px;}
+.sheet .rs-t th.n,.sheet .rs-t td.n{text-align:center;}
+.sheet .bc{height:10px;border-radius:99px;background:#E9DCC9;overflow:hidden;}.sheet .bc i{display:block;height:100%;border-radius:99px;background:var(--c);}
+.sheet .rs-dist{display:flex;gap:4px;height:14px;}.sheet .rs-dist i{display:block;border-radius:99px;}
+.sheet .rs-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:11px;font-size:13px;color:#6B5640;font-weight:700;}
+.sheet .rs-leg span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--lc);margin-left:6px;}
+.sheet .rs-ok{padding:18px;border-radius:16px;background:#DFF3E8;color:#1D7A55;text-align:center;font-weight:800;font-size:16px;margin-top:26px;}
+.sheet .rs-t td{line-height:1.5;}
+.sheet .rs-c .t{font-size:14.5px;gap:6px;}.sheet .rs-c .t span{white-space:nowrap;letter-spacing:-.2px;}
+.sheet .rs-cr{column-gap:26px;}

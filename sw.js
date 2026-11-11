@@ -1,5 +1,5 @@
 // التطبيق بيجيب آخر نسخة من النت الأول، ولو مفيش نت بيشتغل من النسخة المحفوظة
-const CACHE = 'twh-workers-v9';
+const CACHE = 'twh-workers-v10';
 const FILES = ['./','./index.html','./style.css','./app.js','./data.js','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./art.svg','./logo-emblem.png',
   './xlsx.mini.min.js','./html-to-image.js',
   './tajawal-arabic-500-normal.woff2','./tajawal-arabic-700-normal.woff2','./tajawal-arabic-800-normal.woff2',
