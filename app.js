@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '10';
+const VER = '11';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -27,6 +27,8 @@ const I = {
   cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3.5"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>',
   flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 5h12l-2.5 4L17 13H5"/></svg>',
   gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
+  check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  zoom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M11 8.5v5M8.5 11h5"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
 };
 
@@ -230,7 +232,7 @@ function reportCard(sec) {
 }
 
 /* ---------------- الشاشات الرئيسية ---------------- */
-const emptyState = () => `<div class="card empty"><div class="big">${I.db}</div><h2>ابدأ برفع ملف التقييم</h2><p>اختار ملف الإكسل بتاع تقييم العمال، والتطبيق هيعمل ملفات العمال والترتيب والتقارير لوحده. البيانات بتفضل على موبايلك بس.</p><button class="btn" data-act="import">${I.db}اختيار ملف Excel</button></div>`;
+const emptyState = () => `<div class="card empty"><div class="big">${I.users}</div><h2>لسه مفيش عمال</h2><p>ابدأ بإضافة أول عامل، أو ارفع ملف الإكسل بتاعك لو عندك.</p><div class="row2" style="justify-content:center"><button class="btn" data-act="add">إضافة عامل</button><button class="btn ghost2" data-act="import">رفع ملف Excel</button></div></div>`;
 
 function renderList() {
   const el = $('#v-list');
@@ -247,7 +249,7 @@ function renderList() {
   $('#q').addEventListener('input', e => { state.q = e.target.value; fillWL(D.workers.filter(w => (!state.sec || w.section === state.sec) && (!state.q.trim() || w.name.includes(state.q.trim())))); });
 }
 function fillWL(list) {
-  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${w.rank ?? '–'}</div>`}<div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
+  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${I.user}</div>`}<div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}${w.rank ? '، الترتيب ' + w.rank : ''}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
 }
 function renderRank() {
   const el = $('#v-rank');
@@ -261,7 +263,7 @@ function renderReports() {
   const el = $('#v-rep');
   if (!D) { el.innerHTML = emptyState(); return; }
   const all = stats(D.workers);
-  const card = (title, sub, st, hue, icon, attr) => `<button class="rep tone-${toneOf(st.avg)}" ${attr} style="--h:${hue}"><div class="ic">${icon}</div><div class="tx"><b>${esc(title)}</b><small>${sub}</small></div><div class="av2">${fmt(st.avg)}</div></button>`;
+  const card = (title, sub, st, hue, icon, attr) => `<button class="rep tone-${toneOf(st.avg)}" ${attr} ><div class="ic">${icon}</div><div class="tx"><b>${esc(title)}</b><small>${sub}</small></div><div class="av2">${fmt(st.avg)}</div></button>`;
   el.innerHTML = `<div class="list">${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}</div>
     <div class="h2">تقارير الأقسام (كل قسم لوحده)</div>
     <div class="list">${D.sections.map((s, i) => { const l = D.workers.filter(w => w.section === s), st = stats(l); return card(s, `${st.n} عمال، ${st.dec.ok} مؤهل، ${st.dec.warn} متابعة`, st, HUES[i % HUES.length], I.doc, `data-r="${esc(s)}"`); }).join('')}</div>`;
@@ -269,11 +271,15 @@ function renderReports() {
 function renderData() {
   const el = $('#v-data');
   if (!D) { el.innerHTML = emptyState(); return; }
-  el.innerHTML = `<div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
+  const tm = localStorage.getItem('twh_theme') || 'dark';
+  el.innerHTML = `<div class="card info"><h3>المظهر</h3><div class="seg2">${[['dark', 'داكن'], ['light', 'فاتح'], ['auto', 'تلقائي']].map(x => `<button data-th="${x[0]}" class="${tm === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div></div>
+    <div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
     <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button><button class="btn ghost2" data-act="check">فحص ملفات التطبيق</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
+function applyTheme(m) { const light = m === 'light' || (m === 'auto' && matchMedia('(prefers-color-scheme: light)').matches); document.documentElement.dataset.theme = light ? 'light' : 'dark'; const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = light ? '#F6F0E6' : '#1B0C03'; }
+function setTheme(m) { try { localStorage.setItem('twh_theme', m); } catch (e) {} applyTheme(m); renderData(); }
 function reportErr(e) { console.error(e); const b = document.getElementById('fixbtn'); if (b) { b.classList.remove('hide'); b.innerHTML = 'التطبيق مش بيفتح؟ دوس هنا للتحديث<br><small>' + esc(String(e && e.message || e)).slice(0, 90) + '</small>'; } }
 function renderAll() { [renderList, renderAtt, renderVio, renderRank, renderReports, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
@@ -283,18 +289,21 @@ function setTab(t) {
   $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rank:'ترتيب العمال', rep:'التقارير', data:'البيانات' }[t];
   $('#fab').classList.toggle('hide', t !== 'list');
   try { if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, data: renderData })[t](); } catch (e) { reportErr(e); } syncVioBar();
+  const vw = $('#v-' + t); vw.classList.remove('vin'); void vw.offsetWidth; vw.classList.add('vin');
   window.scrollTo(0, 0);
 }
 
 /* ---------------- صفحة التفاصيل + الصورة ---------------- */
 let cur = null;
+let zoomed = false;
 function fitSheet() {
   const fit = document.querySelector('#shot .fit'); if (!fit) return;
-  const sh = fit.firstElementChild, sc = Math.min(1, fit.clientWidth / 800);
+  fit.classList.toggle('zoom', zoomed); $('#zoomBtn').classList.toggle('on', zoomed);
+  const sh = fit.firstElementChild, sc = zoomed ? 1 : Math.min(1, fit.clientWidth / 800);
   sh.style.transform = `scale(${sc})`; fit.style.height = Math.ceil(sh.offsetHeight * sc) + 'px';
 }
 function setShot(html) {
-  const s = $('#shot'); s.innerHTML = html; s.classList.toggle('wide', !!s.querySelector('.sheet'));
+  const s = $('#shot'); zoomed = false; s.innerHTML = html; $('#zoomBtn').classList.toggle('hide', !s.querySelector('.sheet')); s.classList.toggle('wide', !!s.querySelector('.sheet'));
   fitSheet(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSheet);
 }
 window.addEventListener('resize', fitSheet);
@@ -501,7 +510,7 @@ function fillAtt() {
   $('#attChips').innerHTML = rec.map(w => `<button class="dchip tone-${tn[att.type]}" data-aw="${w.id}">${esc(w.name)} ×</button>`).join('');
   const list = D.workers.filter(w => (!att.sec || w.section === att.sec) && (!q || w.name.includes(q)));
   $('#attRows').innerHTML = list.map(w => { const t = dayStatus(w, s), tone = t ? tn[t] : 'ok';
-    return `<button class="arow tone-${tone} ${t ? 'is' : ''}" data-aw="${w.id}"><div class="chk">${t ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div><div class="stp">${t || 'حاضر'}</div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
+    return `<button class="arow tone-${tone} ${t ? 'is' : 'pres'}" data-aw="${w.id}"><div class="chk">${t ? I.check : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div>${t ? `<div class="stp">${t}</div>` : ''}</button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
 }
 function tapAtt(id) {
   const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s);
@@ -533,7 +542,7 @@ function fillVio() {
   const q = vst.q.trim();
   const list = D.workers.filter(w => (!vst.sec || w.section === vst.sec) && (!q || w.name.includes(q)));
   $('#vioRows').innerHTML = list.map(w => { const on = vst.sel.has(w.id);
-    return `<button class="arow tone-bad ${on ? 'is' : ''}" data-vs="${w.id}"><div class="chk">${on ? '✓' : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}${w.cntVio ? '، مخالفات: ' + w.cntVio : ''}</small></div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
+    return `<button class="arow tone-bad ${on ? 'is' : ''}" data-vs="${w.id}"><div class="chk">${on ? I.check : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}${w.cntVio ? '، مخالفات: ' + w.cntVio : ''}</small></div></button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
 }
 function syncVioBar() {
   const n = vst.sel.size, show = state.tab === 'vio' && n > 0;
@@ -586,11 +595,12 @@ function deleteWorker(i) {
 document.addEventListener('click', e => {
   const w2 = e.target.closest('[data-w2]');
   if (w2 && cur && cur.wid != null) { const k = w2.dataset.w2; return k === 'reeval' ? openEditor(cur.wid, 'reeval') : k === 'edit' ? openEditor(cur.wid) : deleteWorker(cur.wid); }
-  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],#vioGo');
+  const t = e.target.closest('[data-aw],[data-vs],[data-dd],[data-vd],[data-at],[data-asec],[data-vsec],[data-act],[data-th],#vioGo');
   if (!t || !D) return;
   const d = t.dataset;
+  if (d.th) return setTheme(d.th);
   if (d.aw != null) return tapAtt(+d.aw);
-  if (d.vs != null) { const id = +d.vs; vst.sel.has(id) ? vst.sel.delete(id) : vst.sel.add(id); t.classList.toggle('is'); t.querySelector('.chk').textContent = vst.sel.has(id) ? '✓' : ''; return syncVioBar(); }
+  if (d.vs != null) { const id = +d.vs; vst.sel.has(id) ? vst.sel.delete(id) : vst.sel.add(id); t.classList.toggle('is'); t.querySelector('.chk').innerHTML = vst.sel.has(id) ? I.check : ''; return syncVioBar(); }
   if (d.dd) { const [k, n] = d.dd.split(':'); const o = k === 'att' ? att : vst; o.iso = shiftISO(o.iso, +n); return k === 'att' ? renderAtt() : renderVio(); }
   if (d.at) { att.type = d.at; return renderAtt(); }
   if (d.asec != null) { att.sec = d.asec; return renderAtt(); }
@@ -626,13 +636,15 @@ $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f)
 $('#back').addEventListener('click', () => history.back());
 window.addEventListener('popstate', () => { if ($('#editor').classList.contains('show')) closeEditor(); else closePage(); });
 $('#fab').addEventListener('click', () => openEditor(-1));
+$('#zoomBtn').addEventListener('click', () => { zoomed = !zoomed; fitSheet(); toast(zoomed ? 'تكبير: اسحب يمين وشمال' : 'رجوع للحجم الكامل'); });
 $('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
 $('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
-$('#back').innerHTML = I.back; $('.gear').innerHTML = I.gear; $('#vioGo').textContent = '';
+$('#back').innerHTML = I.back; $('.gear').insertAdjacentHTML('afterbegin', I.gear); $('#zoomBtn').innerHTML = I.zoom; $('#vioGo').textContent = '';
 $('#bSave').insertAdjacentHTML('afterbegin', I.dl); $('#bWa').insertAdjacentHTML('afterbegin', I.wa); $('#bCopy').insertAdjacentHTML('afterbegin', I.copy);
 document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afterbegin', I[b.dataset.icon]));
 
+try { applyTheme(localStorage.getItem('twh_theme') || 'dark'); } catch (e) {}
 load(); renderAll(); setTab('list');
 window.__booted = true;
 window.__app = { get D() { return D; }, parseWorkbook, enrich };
