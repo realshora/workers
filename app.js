@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '13';
+const VER = '14';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -29,12 +29,13 @@ const I = {
   gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
   check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   zoom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M11 8.5v5M8.5 11h5"/></svg>',
+  del:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5H9l-6 7 6 7h11a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="M16 9.5l-5 5M11 9.5l5 5"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
 };
 
 let D = null;           // البيانات بعد المعالجة
 let RAW = null;         // البيانات الخام اللي بتتعدّل
-let state = { tab:'list', q:'', sec:'', rsec:'' };
+let state = { tab:'list', q:'', sec:'', rsec:'', sort:'orig', dec:'' };
 
 /* ---------------- قراءة ملف الإكسل ---------------- */
 function parseWorkbook(wb) {
@@ -103,6 +104,11 @@ function enrich(raw) {
     w.prevAvg = w.hist && w.hist.length ? w.hist[w.hist.length - 1].avg : null;
     w.alerts = [];
     if (w.complete) { if (w.scores[0] <= d.T.alert) w.alerts.push(CRIT[0]); if (w.scores[4] <= d.T.alert) w.alerts.push(CRIT[4]); }
+  });
+  d.workers.forEach(w => {
+    w.absFlags = absFlagsOf(w);
+    w.trend = (d.archive || []).map(m => { const x = (m.workers || []).find(y => y.name === w.name); return { m: m.month, avg: x ? avgOfScores(x.scores) : null }; }).filter(t => t.avg != null);
+    if (w.prevAvg == null && w.trend.length) w.prevAvg = w.trend[w.trend.length - 1].avg;
   });
   const ev = d.workers.filter(w => w.avg != null);
   d.total = ev.length;
@@ -190,6 +196,11 @@ function rsIns(vals, l1, l2) {
 const distBar = st => { const ks = ['ok', 'warn', 'bad', 'none'].filter(k => st.dec[k]);
   return ks.length ? `<div class="rs-dist">${ks.map(k => `<i style="flex:${st.dec[k]};background:${TC[k]}"></i>`).join('')}</div><div class="rs-leg">${ks.map(k => `<span style="--lc:${TC[k]}">${TONE_LABEL[k]} (${st.dec[k]})</span>`).join('')}</div>` : ''; };
 
+function trendHtml(w) {
+  const pts = w.trend.map(t => ({ m: t.m, v: t.avg })).concat(w.avg != null ? [{ m: D.month, v: w.avg }] : []).slice(-6);
+  if (pts.length < 2) return '';
+  return H('تطور التقييم') + `<div class="rs-cr">${pts.map(p => `<div class="rs-c c-${cTone(p.v)}"><div class="t"><span>${esc(p.m)}</span><b>${fmt(p.v)}</b></div><div class="bc"><i style="width:${p.v / 5 * 100}%"></i></div></div>`).join('')}</div>`;
+}
 /* ---------------- تقرير العامل ---------------- */
 function workerCard(w) {
   const abs = w.abs.slice().sort((x, y) => x.s - y.s), vio = w.vio.slice().sort((x, y) => x.s - y.s), ev = w.avg != null;
@@ -199,10 +210,10 @@ function workerCard(w) {
     ranks: [{ v: ev ? w.rank : '—', s: ev ? D.total + ' /' : '', l: 'الترتيب العام' }, { v: ev ? w.srank : '—', s: ev ? w.stotal + ' /' : '', l: 'الترتيب في القسم' }],
     tiles: [[w.cntAbs, 'غياب'], [w.cntPerm, 'إذن'], [w.cntLeave, 'إجازة'], [w.cntVio, 'مخالفات']],
     title: 'تقرير تقييم الأداء الشهري', name: w.name, tags: [w.section, w.status ? 'عامل ' + w.status : ''], photo: w.photo,
-    alert: w.alerts.length ? 'تنبيه: درجة منخفضة في ' + w.alerts.join(' و ') : '',
+    alert: [w.alerts.length ? 'درجة منخفضة في ' + w.alerts.join(' و ') : '', ...w.absFlags].filter(Boolean).length ? 'تنبيه: ' + [w.alerts.length ? 'درجة منخفضة في ' + w.alerts.join(' و ') : '', ...w.absFlags].filter(Boolean).join('، ') : '',
     body: H('التقييم التفصيلي') + (w.complete ? critGrid(w.scores, false) + rsIns(w.scores, 'أقوى نقطة', 'محتاج تحسين') : '<div class="rs-none">لم يتم إدخال تقييم هذا الشهر</div>')
-      + H('سجل الغياب والإذن والإجازات') + tbl([['التاريخ', '34%'], ['النوع', '20%'], ['السبب']], abs.map(x => tr([fmtDate(x.s), x.t, { h: esc(x.r || '—'), c: 'mut' }])), 'لا يوجد غياب أو إذن أو إجازة')
-      + H('المخالفات') + tbl([['التاريخ', '30%'], ['سبب المخالفة'], ['الإجراء', '22%']], vio.map(x => tr([fmtDate(x.s), esc(x.type) + (x.detail ? ': ' + esc(x.detail) : ''), { h: esc(x.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة') });
+      + trendHtml(w) + H('سجل الغياب والإذن والإجازات') + tbl([['التاريخ', '34%'], ['النوع', '20%'], ['السبب']], abs.map(x => tr([fmtDate(x.s), x.t, { h: esc(x.r || '—'), c: 'mut' }])), 'لا يوجد غياب أو إذن أو إجازة')
+      + H('المخالفات') + tbl([['التاريخ', '30%'], ['سبب المخالفة'], ['الإجراء', '22%']], vio.map(x => tr([fmtDate(x.s), esc(x.type) + (x.detail ? ': ' + esc(x.detail) : ''), { h: esc(x.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة') + (w.note ? H('ملاحظات') + `<div class="rs-note">${esc(w.note)}</div>` : '') });
 }
 
 /* ---------------- تقرير القسم / القسم كله ---------------- */
@@ -232,24 +243,36 @@ function reportCard(sec) {
 }
 
 /* ---------------- الشاشات الرئيسية ---------------- */
-const emptyState = () => `<div class="card empty"><div class="big">${I.users}</div><h2>لسه مفيش عمال</h2><p>ابدأ بإضافة أول عامل، أو ارفع ملف الإكسل بتاعك لو عندك.</p><div class="row2" style="justify-content:center"><button class="btn" data-act="add">إضافة عامل</button><button class="btn ghost2" data-act="import">رفع ملف Excel</button></div></div>`;
+const emptyState = () => `<div class="card empty"><div class="big">${I.users}</div><h2>لسه مفيش عمال</h2><p>ابدأ بإضافة أول عامل، أو ارفع ملف الإكسل أو نسخة احتياطية سبق حفظتها.</p><div class="row2" style="justify-content:center"><button class="btn" data-act="add">إضافة عامل</button><button class="btn ghost2" data-act="import">رفع ملف Excel</button></div></div>`;
 
 function renderList() {
   const el = $('#v-list');
   if (!D) { el.innerHTML = emptyState(); return; }
   const st = stats(D.workers);
   const q = state.q.trim();
-  let list = D.workers.filter(w => (!state.sec || w.section === state.sec) && (!q || w.name.includes(q)));
-  el.innerHTML = `
-    <div class="bento"><div class="bb avg"><i class="tape"></i><span>متوسط التقييم</span><b>${fmt(st.avg)}</b></div><div class="bb"><b>${D.workers.length}</b><span>عامل</span></div><div class="bb sun"><b>${st.dec.ok}</b><span>مؤهل ويكمل</span></div></div>
+  el.innerHTML = `${backupBanner()}
+    <div class="bento"><div class="bb avg"><i class="tape"></i><span>متوسط التقييم</span><b>${fmt(st.avg)}</b></div><div class="bb"><b>${D.workers.length}</b><span>عامل</span></div><div class="bb sun"><b>${st.dec.ok}</b><span>مؤهل ويكمل</span></div></div>${flagsCard()}
     <div class="stick"><label class="search">${I.search}<input id="q" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(state.q)}" autocomplete="off"></label>
     <div class="chips"><button class="fchip ${state.sec ? '' : 'on'}" data-sec="">الكل</button>${D.sections.map(s => `<button class="fchip ${state.sec === s ? 'on' : ''}" data-sec="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>
+    <div class="fsel"><label>ترتيب<select id="sortSel" aria-label="ترتيب القائمة">${[['orig', 'الترتيب الأصلي'], ['name', 'الاسم'], ['rank', 'التقييم، الأعلى أولًا'], ['abs', 'الغياب، الأكثر أولًا'], ['vio', 'المخالفات، الأكثر أولًا']].map(x => `<option value="${x[0]}" ${state.sort === x[0] ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></label>
+    <label>القرار<select id="decSel" aria-label="فلتر القرار">${[['', 'الكل'], ['ok', 'مؤهل ويكمل'], ['warn', 'يكمل مع متابعة'], ['bad', 'تدريب وإعادة تقييم'], ['none', 'لم يُقيَّم']].map(x => `<option value="${x[0]}" ${state.dec === x[0] ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></label></div>
     <div class="list" id="wl"></div>`;
-  fillWL(list);
-  $('#q').addEventListener('input', e => { state.q = e.target.value; fillWL(D.workers.filter(w => (!state.sec || w.section === state.sec) && (!state.q.trim() || w.name.includes(state.q.trim())))); });
+  fillWL(wlList());
+  $('#q').addEventListener('input', e => { state.q = e.target.value; fillWL(wlList()); });
+  $('#sortSel').addEventListener('change', e => { state.sort = e.target.value; fillWL(wlList()); });
+  $('#decSel').addEventListener('change', e => { state.dec = e.target.value; fillWL(wlList()); });
 }
+function wlList() {
+  const q = state.q.trim();
+  const l = D.workers.filter(w => (!state.sec || w.section === state.sec) && (!q || w.name.includes(q)) && (!state.dec || w.tone === state.dec));
+  const cmp = { name: (x, y) => x.name.localeCompare(y.name, 'ar'), rank: byRank, abs: (x, y) => y.cntAbs - x.cntAbs || byRank(x, y), vio: (x, y) => y.cntVio - x.cntVio || byRank(x, y) }[state.sort];
+  return cmp ? l.slice().sort(cmp) : l;
+}
+const backupDue = () => RAW && !RAW.builtin && (!RAW.lastBackup || (Date.now() - new Date(RAW.lastBackup).getTime()) / 864e5 > 7);
+const backupBanner = () => backupDue() ? `<div class="banner"><span>مفيش نسخة احتياطية من أكتر من أسبوع. احفظ نسخة عشان بياناتك ما تضيعش.</span><button class="btn sm" data-act="backup">حفظ نسخة</button></div>` : '';
+const flagsCard = () => { const f = D.workers.filter(w => w.absFlags.length); return f.length ? `<div class="card info flags"><h3>تنبيهات الغياب (${f.length})</h3><div class="dchips">${f.map(w => `<button class="dchip tone-bad" data-w="${w.id}">${esc(w.name)}: ${esc(w.absFlags[0])}</button>`).join('')}</div></div>` : ''; };
 function fillWL(list) {
-  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${I.user}</div>`}<div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}${w.rank ? '، الترتيب ' + w.rank : ''}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
+  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${I.user}</div>`}<div class="wmain"><b>${esc(w.name)}${w.absFlags.length ? ' <span class="flag">غياب متكرر</span>' : ''}</b><small>${esc(w.section)}${w.rank ? '، الترتيب ' + w.rank : ''}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
 }
 function renderRank() {
   const el = $('#v-rank');
@@ -265,17 +288,21 @@ function renderReports() {
   const all = stats(D.workers);
   const card = (title, sub, st, hue, icon, attr) => `<button class="rep tone-${toneOf(st.avg)}" ${attr} ><div class="ic">${icon}</div><div class="tx"><b>${esc(title)}</b><small>${sub}</small></div><div class="av2">${fmt(st.avg)}</div></button>`;
   const absToday = D.workers.filter(w => dayStatus(w, isoToSerial(att.iso)) === 'غياب').length;
-  el.innerHTML = `<div class="list">${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}<button class="rep tone-${absToday ? 'bad' : 'ok'}" data-act="absrep"><div class="ic">${I.cal}</div><div class="tx"><b>تقرير الغياب للإدارة</b><small>غياب اليوم والإجمالي الشهري من الأكثر للأقل</small></div><div class="av2">${absToday}</div></button></div>
+  el.innerHTML = `<div class="list">${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}<button class="rep tone-${absToday ? 'bad' : 'ok'}" data-act="absrep"><div class="ic">${I.cal}</div><div class="tx"><b>تقرير الغياب للإدارة</b><small>غياب اليوم والإجمالي الشهري من الأكثر للأقل</small></div><div class="av2">${absToday}</div></button><button class="rep" data-act="pdf"><div class="ic">${I.doc}</div><div class="tx"><b>طباعة أو PDF للتقارير</b><small>كل العمال أو قسم أو حزمة الإدارة</small></div></button></div>
     <div class="h2">تقارير الأقسام (كل قسم لوحده)</div>
     <div class="list">${D.sections.map((s, i) => { const l = D.workers.filter(w => w.section === s), st = stats(l); return card(s, `${st.n} عمال، ${st.dec.ok} مؤهل، ${st.dec.warn} متابعة`, st, HUES[i % HUES.length], I.doc, `data-r="${esc(s)}"`); }).join('')}</div>`;
 }
 function renderData() {
   const el = $('#v-data');
   if (!D) { el.innerHTML = emptyState(); return; }
-  const tm = localStorage.getItem('twh_theme') || 'dark';
+  const tm = localStorage.getItem('twh_theme') || 'dark', hasPin = !!localStorage.getItem('twh_pin');
+  const arcHtml = (D.archive || []).length ? `<div class="card info"><h3>الشهور السابقة</h3><p>كل شهر بتبدأ شهر جديد، الشهر القديم بيتحفظ هنا، وبيظهر تطور تقييم كل عامل في ملفه.</p>${D.archive.map((m, i) => `<div class="arc"><b>${esc(m.month)}</b><div class="row2"><button class="btn ghost2 sm" data-act="arcrep" data-i="${i}">تقرير القسم كله</button><button class="btn danger sm" data-act="arcdel" data-i="${i}">حذف</button></div></div>`).join('')}</div>` : '';
+  const pinHtml = `<div class="card info"><h3>قفل التطبيق</h3><p>${hasPin ? 'القفل شغال: التطبيق بيطلب الرقم السري عند الفتح وبعد ما تسيبه دقيقتين.' : 'اختياري: رقم سري من 4 أرقام لفتح التطبيق. بيحمي من الاستخدام العادي، مش تشفير كامل. لو نسيته مفيش استرجاع غير مسح بيانات التطبيق، فاحفظ نسخة احتياطية الأول.'}</p><div class="row2">${hasPin ? '<button class="btn ghost2" data-act="pinon">تغيير الرقم</button><button class="btn danger" data-act="pinoff">إلغاء القفل</button>' : '<button class="btn" data-act="pinon">تفعيل القفل</button>'}</div></div>`;
   el.innerHTML = `<div class="card info"><h3>المظهر</h3><div class="seg2">${[['dark', 'داكن'], ['light', 'فاتح'], ['auto', 'تلقائي']].map(x => `<button data-th="${x[0]}" class="${tm === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div></div>
-    <div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" aria-label="اسم الشهر" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
-    <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
+    <div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" aria-label="اسم الشهر" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>${arcHtml}
+    <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button><button class="btn ghost2" data-act="xlsx">تصدير إلى Excel</button></div></div>
+    ${pinHtml}
+    <div class="card info"><h3>سجل التعديلات</h3><p>مين غيّر إيه ومتى (آخر 300 عملية).</p><div class="row2"><button class="btn ghost2" data-act="log">عرض السجل</button></div></div>
     <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button><button class="btn ghost2" data-act="check">فحص ملفات التطبيق</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
@@ -345,13 +372,13 @@ async function withBlob(fn) {
   busy(false);
   try { await fn(b); } catch (e) { console.error(e); toast('تعذّر تنفيذ العملية، جرب تاني'); }
 }
-function download(b) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cur.file + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
-const doSave = () => withBlob(async b => { download(b); toast('الصورة اتحفظت (في التحميلات)'); });
+function downloadImg(b) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cur.file + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+const doSave = () => withBlob(async b => { downloadImg(b); toast('الصورة اتحفظت (في التحميلات)'); });
 const doShare = () => withBlob(async b => {
   const f = new File([b], cur.file + '.png', { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
     try { await navigator.share({ files: [f], title: cur.title }); } catch (e) { if (e && e.name !== 'AbortError') throw e; }
-  } else { download(b); toast('الصورة اتحفظت، ابعتها من الواتساب'); window.open('https://wa.me/', '_blank'); }
+  } else { downloadImg(b); toast('الصورة اتحفظت، ابعتها من الواتساب'); window.open('https://wa.me/', '_blank'); }
 });
 const doCopy = () => withBlob(async b => {
   try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('الصورة اتنسخت، الصقها في أي محادثة'); }
@@ -368,7 +395,7 @@ function hideToast() { $('#toast').classList.remove('show'); }
 function ask(o) {
   return new Promise(res => {
     const d = document.createElement('div'); d.className = 'dlg';
-    d.innerHTML = `<div class="box" role="dialog" aria-modal="true"><h3>${esc(o.title || '')}</h3>${o.text ? `<p>${esc(o.text)}</p>` : ''}${o.input ? `<input class="fin" id="dlgIn" placeholder="${esc(o.input)}" aria-label="${esc(o.input)}" autocomplete="off">` : ''}<div class="row2"><button class="btn ${o.danger ? 'danger' : ''}" data-d="ok">${esc(o.ok || 'تأكيد')}</button><button class="btn ghost2" data-d="no">إلغاء</button></div></div>`;
+    d.innerHTML = `<div class="box" role="dialog" aria-modal="true"><h3>${esc(o.title || '')}</h3>${o.text ? `<p>${esc(o.text)}</p>` : ''}${o.input ? `<input class="fin" id="dlgIn" type="${o.itype || 'text'}" ${o.itype === 'password' ? 'inputmode="numeric" maxlength="4"' : ''} placeholder="${esc(o.input)}" aria-label="${esc(o.input)}" autocomplete="off">` : ''}<div class="row2"><button class="btn ${o.danger ? 'danger' : ''}" data-d="ok">${esc(o.ok || 'تأكيد')}</button><button class="btn ghost2" data-d="no">إلغاء</button></div></div>`;
     document.body.appendChild(d);
     const done = v => { d.remove(); res(v); };
     d.addEventListener('click', e => { const k = e.target.dataset && e.target.dataset.d; if (k === 'ok') done(o.input ? (d.querySelector('#dlgIn').value.trim() || null) : true); else if (k === 'no' || e.target === d) done(null); });
@@ -379,6 +406,16 @@ function ask(o) {
 /* ---------------- استيراد وتخزين ---------------- */
 function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
 const now = () => new Date().toLocaleString('en-GB', { hour12: false }).slice(0, 17);
+const avgOfScores = sc => (sc && sc.length === 8 && sc.every(x => typeof x === 'number')) ? Math.round(sc.reduce((p, q) => p + q, 0) / 8 * 100 + 1e-7) / 100 : null;
+function absFlagsOf(w) {
+  const days = [...new Set(w.abs.filter(x => x.t === 'غياب').map(x => x.s))].sort((x, y) => x - y);
+  let best = 0, cur = 0, prev = null; days.forEach(s => { cur = prev != null && s - prev === 1 ? cur + 1 : 1; best = Math.max(best, cur); prev = s; });
+  const f = []; if (best >= 3) f.push(best + ' أيام غياب متتالية');
+  for (let i = 0; i + 2 < days.length; i++) if (days[i + 2] - days[i] <= 6) { f.push('3 غيابات في أسبوع واحد'); break; }
+  return f;
+}
+const snapshotOf = r => ({ month: r.month, T: r.T, workers: r.workers.map(w => ({ name: w.name, section: w.section, status: w.status, scores: w.scores.slice(), abs: w.abs.slice(), vio: w.vio.slice() })) });
+function logAct(m) { RAW.log = (RAW.log || []).concat([{ t: Date.now(), m }]).slice(-300); }
 function sanitize(r) {
   r.T = r.T || { ok: 4, follow: 3, alert: 2 }; r.month = String(r.month || ''); r.workers = (r.workers || []).filter(w => w && w.name);
   r.workers.forEach(w => { w.name = String(w.name); w.section = String(w.section || 'بدون قسم'); w.status = String(w.status || '');
@@ -390,6 +427,7 @@ function rebuild() { if (!RAW) { D = null; return; } D = enrich(RAW); D.fileName
 function load() {
   try { const r = localStorage.getItem(LS); if (r) RAW = sanitize(JSON.parse(r)); } catch (e) { RAW = null; }
   if (!RAW && window.BUILTIN) { RAW = sanitize(JSON.parse(JSON.stringify(window.BUILTIN))); RAW.builtin = true; }
+  if (RAW && RAW.builtin) { try { localStorage.setItem(LS, JSON.stringify(RAW)); } catch (e) {} }
   try { rebuild(); } catch (e) { reportErr(e); RAW = null; if (window.BUILTIN) { RAW = sanitize(JSON.parse(JSON.stringify(window.BUILTIN))); RAW.builtin = true; rebuild(); } }
 }
 let skipRefresh = false;
@@ -414,7 +452,7 @@ async function importFile(file) {
       if (typeof XLSX === 'undefined') throw new Error('ملف xlsx.mini.min.js مش مرفوع على GitHub.');
       raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' })); raw.fileName = file.name;
     }
-    raw.importedAt = now(); raw.builtin = false; RAW = raw;
+    raw.importedAt = now(); raw.builtin = false; RAW = raw; logAct('استيراد ملف ' + file.name);
     state.q = ''; state.sec = ''; state.rsec = '';
     commit(`تم التحديث: ${RAW.workers.length} عامل`); setTab('list');
   } catch (e) { console.error(e); toast(e.message || 'مقدرتش أقرا الملف'); }
@@ -432,6 +470,7 @@ function openEditor(i, mode) {
   $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel" aria-label="رجوع">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : (ed.mode === 'reeval' ? 'إعادة تقييم ' : 'تعديل ') + esc(w.name)}</h2></div>
   <div class="ebody">
     <div class="fs${hd}"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
+      <label>ملاحظات (اختياري)<textarea id="eNote" rows="2" placeholder="أي ملاحظة عن العامل">${esc(w.note || '')}</textarea></label>
       <label>القسم<input id="eSec" list="dlSecs" value="${esc(w.section)}" placeholder="اختار قسم أو اكتب قسم جديد" autocomplete="off"></label>
       <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
     <div class="fs" id="sScores"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
@@ -491,7 +530,8 @@ $('#editor').addEventListener('click', e => {
       ed.w.hist = (old.hist || []).concat({ d: todayISO(), avg: oa }).slice(-12);
     }
     if (ed.i < 0) RAW.workers.push(ed.w); else RAW.workers[ed.i] = ed.w;
-    const isNew = ed.i < 0; commit(isNew ? 'اتضاف العامل' : 'اتحفظت التعديلات'); return history.back();
+    if (ed.mode !== 'reeval') ed.w.note = ($('#eNote').value || '').trim();
+    const isNew = ed.i < 0; logAct((isNew ? 'إضافة عامل ' : ed.mode === 'reeval' ? 'إعادة تقييم ' : 'تعديل ') + name); commit(isNew ? 'اتضاف العامل' : 'اتحفظت التعديلات'); return history.back();
   }
   if (k === 'del') return removeWorker(ed.i, true);
 });
@@ -513,6 +553,7 @@ function renderAtt() {
   el.innerHTML = `${dsel('att', att.iso)}
     <div class="tcards">${['غياب', 'إذن', 'إجازة'].map(t => `<button class="tcard tone-${tn[t]} ${att.type === t ? 'on' : ''}" data-at="${t}"><b>${cnt[t]}</b><span>${t} ${att.iso === todayISO() ? 'اليوم' : ''}</span></button>`).join('')}</div>
     <div class="hint">حاليًا بتسجّل <b>${att.type}</b> ${day}: دوس على اسم العامل من القايمة تحت. دوسة تانية بتشيله. باقي العمال بيتحسبوا حاضرين (${D.workers.length - cnt['غياب'] - cnt['إذن'] - cnt['إجازة']} حاضر).</div>
+    <div class="row2" style="margin:0 0 12px"><button class="btn ghost2 sm" data-act="allpres">كل العمال حاضرين</button><button class="btn ghost2 sm" data-act="copyyest">نسخ غياب أمس</button></div>
     <div class="h2" id="attRecTitle"></div><div class="dchips" id="attChips" style="margin-bottom:12px"></div>
     <div class="stick"><label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
     ${secChips('data-asec', att.sec)}</div><div class="list" id="attRows"></div>
@@ -532,7 +573,7 @@ function fillAtt() {
 function tapAtt(id) {
   const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s), prev = JSON.stringify(w.abs);
   w.abs = w.abs.filter(x => x.s !== s); if (!(old && old.t === att.type)) w.abs.push({ s, t: att.type });
-  const y = window.scrollY, removed = old && old.t === att.type; commit(); window.scrollTo(0, y);
+  const y = window.scrollY, removed = old && old.t === att.type; logAct(`${w.name}: ${removed ? 'إلغاء ' : ''}${att.type} ${att.iso}`); commit(); window.scrollTo(0, y);
   toast(removed ? 'اتشال تسجيل ' + w.name : w.name + ': ' + att.type, { label: 'تراجع', fn: () => { RAW.workers[id].abs = JSON.parse(prev); const y2 = window.scrollY; commit(); window.scrollTo(0, y2); } });
 }
 
@@ -572,7 +613,7 @@ function registerVio() {
   if (!type) return toast('اكتب نوع المخالفة');
   vst.sel.forEach(id => RAW.workers[id].vio.push({ s, type, detail: vst.detail.trim(), action: vst.action.trim() }));
   vst.sel.clear(); vst.type = vst.detail = vst.action = '';
-  commit(`اتسجلت المخالفة لـ ${n} عامل`); syncVioBar();
+  logAct(`مخالفة (${type}) لـ ${n} عامل في ${vst.iso}`); commit(`اتسجلت المخالفة لـ ${n} عامل`); syncVioBar();
 }
 
 function attReportCard(iso) {
@@ -598,11 +639,9 @@ function absReportCard(iso) {
   const sumDays = st.reduce((p, x) => p + x.a, 0);
   const hot = n => ({ h: n, c: n >= 3 ? 'n hot' : 'n' });
   const todayRows = today.map(x => tr([esc(x.w.name), esc(x.w.section), { h: esc((x.w.abs.find(y => y.s === s) || {}).r || '—'), c: 'mut' }, hot(x.a)]));
-  const monthRows = month.map((x, i) => tr([{ h: i + 1, c: 'n' }, esc(x.w.name), esc(x.w.section), hot(x.a), { h: x.p, c: 'n' }, { h: x.l, c: 'n' }]));
-  const secRows = D.sections.map(sec => { const l = st.filter(x => x.w.section === sec); return tr([esc(sec), { h: l.filter(x => x.day === 'غياب').length, c: 'n' }, { h: l.reduce((p, x) => p + x.a, 0), c: 'n' }]); });
+  const monthRows = month.map((x, i) => tr([{ h: i + 1, c: 'n' }, esc(x.w.name) + (x.w.absFlags.length ? `<span class="rs-flag">${x.w.absFlags[0]}</span>` : ''), esc(x.w.section), hot(x.a), { h: x.p, c: 'n' }, { h: x.l, c: 'n' }]));
   const body = H(`الغياب ${isToday ? 'اليوم' : 'في اليوم ده'} (${today.length})`) + tbl([['العامل'], ['القسم', '27%'], ['السبب', '16%'], ['الإجمالي', '17%', 'n']], todayRows, 'لا يوجد غياب')
-    + H('ترتيب الغياب خلال الشهر، من الأكثر للأقل') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '26%'], ['غياب', '11%', 'n'], ['إذن', '10%', 'n'], ['إجازة', '12%', 'n']], monthRows, 'لا يوجد غياب مسجل')
-    + H('الغياب حسب القسم') + tbl([['القسم'], ['اليوم', '18%', 'n'], ['الشهر', '18%', 'n']], secRows);
+    + H('ترتيب الغياب خلال الشهر، من الأكثر للأقل') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '26%'], ['غياب', '11%', 'n'], ['إذن', '10%', 'n'], ['إجازة', '12%', 'n']], monthRows, 'لا يوجد غياب مسجل');
   return sheetFrame({ tone: pct >= 15 ? 'bad' : today.length ? 'warn' : 'ok', score: today.length, unit: 'غايب من ' + total, pill: today.length ? `نسبة الغياب <bdi dir="ltr">${pct}%</bdi>` : 'مفيش غياب',
     ranks: [{ v: sumDays, l: 'إجمالي أيام الغياب' }, { v: month.length, s: total + ' /', l: 'عمال لهم غياب' }],
     tiles: [[today.length, 'غياب'], [permT, 'إذن'], [leaveT, 'إجازة'], [present, 'حاضر']],
@@ -629,7 +668,7 @@ async function checkFiles() {
 async function removeWorker(i, fromEditor) {
   const w = RAW.workers[i]; if (!w) return;
   const ok = await ask({ title: 'حذف ' + w.name, text: 'هيتحذف العامل مع كل غيابه ومخالفاته وتقييمه.', ok: 'حذف', danger: true }); if (!ok) return;
-  const snap = JSON.stringify(RAW); RAW.workers.splice(i, 1); skipRefresh = true; commit(); skipRefresh = false;
+  const snap = JSON.stringify(RAW); logAct('حذف ' + w.name); RAW.workers.splice(i, 1); skipRefresh = true; commit(); skipRefresh = false;
   if (fromEditor) { history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150); } else if (cur && cur.wid != null) history.back();
   toast('اتحذف ' + w.name, { label: 'تراجع', fn: () => { RAW = JSON.parse(snap); commit('رجع ' + w.name); } });
 }
@@ -647,8 +686,17 @@ document.addEventListener('click', e => {
   if (d.at) { att.type = d.at; return renderAtt(); }
   if (d.asec != null) { att.sec = d.asec; return renderAtt(); }
   if (d.vsec != null) { vst.sec = d.vsec; return renderVio(); }
-  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
+  if (d.vd) { const [id, n] = d.vd.split(':').map(Number); logAct('مسح مخالفة لـ ' + RAW.workers[id].name); RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
   if (t.id === 'vioGo') return registerVio();
+  if (d.act === 'xlsx') return exportXlsx();
+  if (d.act === 'pinon') return pinOn();
+  if (d.act === 'pinoff') return pinOff();
+  if (d.act === 'log') return openLog();
+  if (d.act === 'allpres') return attAllPresent();
+  if (d.act === 'copyyest') return attCopyYest();
+  if (d.act === 'pdf') return printPick();
+  if (d.act === 'arcrep') { const i = +d.i, m = RAW.archive[i].month; return openPage('تقرير ' + m, withMonth(i, () => reportCard(null)), 'تقرير القسم كله ' + m); }
+  if (d.act === 'arcdel') { const i = +d.i; ask({ title: 'حذف شهر ' + RAW.archive[i].month, text: 'هيتحذف الشهر المحفوظ ده نهائيًا.', ok: 'حذف', danger: true }).then(ok => { if (ok) { logAct('حذف شهر محفوظ ' + RAW.archive[i].month); RAW.archive.splice(i, 1); commit('اتحذف الشهر'); } }); return; }
   if (d.act === 'absrep') return openPage('تقرير الغياب', absReportCard(att.iso), `غياب ${fmtDate(isoToSerial(att.iso))}`);
   if (d.act === 'attrep') return openPage('تقرير الحضور', attReportCard(att.iso), `حضور ${fmtDate(isoToSerial(att.iso))}`);
   if (d.act === 'viorep') return openPage('تقرير المخالفات', vioReportCard(vst.iso), `مخالفات ${fmtDate(isoToSerial(vst.iso))}`);
@@ -657,6 +705,87 @@ document.addEventListener('change', e => {
   const k = e.target.dataset && e.target.dataset.dk; if (!k || !e.target.value) return;
   (k === 'att' ? att : vst).iso = e.target.value; k === 'att' ? renderAtt() : renderVio();
 });
+
+
+/* ---------------- إضافات: تصدير، قفل، سجل، طباعة ---------------- */
+function download(b, name) { const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(l.href), 5000); }
+function exportXlsx() {
+  if (typeof XLSX === 'undefined') return toast('ملف xlsx.mini.min.js مش مرفوع على GitHub');
+  const wb = XLSX.utils.book_new();
+  const r1 = [['الاسم', 'القسم', 'الحالة', ...CRIT, 'المتوسط', 'القرار', 'الترتيب العام', 'غياب', 'إذن', 'إجازة', 'مخالفات', 'ملاحظات']].concat(D.workers.map(w => [w.name, w.section, w.status, ...w.scores.map(x => x == null ? '' : x), w.avg == null ? '' : w.avg, TONE_LABEL[w.tone], w.rank || '', w.cntAbs, w.cntPerm, w.cntLeave, w.cntVio, w.note || '']));
+  const r2 = [['العامل', 'القسم', 'التاريخ', 'النوع', 'السبب']], r3 = [['العامل', 'القسم', 'التاريخ', 'نوع المخالفة', 'التفاصيل', 'الإجراء']];
+  D.workers.forEach(w => { w.abs.slice().sort((x, y) => x.s - y.s).forEach(x => r2.push([w.name, w.section, fmtDate(x.s), x.t, x.r || ''])); w.vio.slice().sort((x, y) => x.s - y.s).forEach(x => r3.push([w.name, w.section, fmtDate(x.s), x.type, x.detail || '', x.action || ''])); });
+  [['التقييم', r1], ['الغياب', r2], ['المخالفات', r3]].forEach(p => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(p[1]), p[0]));
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  download(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `تقييم عمال التجهيز ${D.month}.xlsx`); toast('اتصدّر ملف Excel');
+}
+async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('twh|' + s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+function showLock() {
+  if (document.getElementById('lock') || !localStorage.getItem('twh_pin')) return;
+  const d = document.createElement('div'); d.id = 'lock'; let buf = '';
+  d.innerHTML = `<div class="lk"><img src="logo-emblem.png" alt=""><h2>اكتب الرقم السري</h2><div class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, 'x'].map(k => k === '' ? '<span></span>' : `<button data-k="${k}" aria-label="${k === 'x' ? 'مسح' : k}">${k === 'x' ? I.del : k}</button>`).join('')}</div></div>`;
+  document.body.appendChild(d);
+  const paint = () => d.querySelectorAll('.dots i').forEach((x, i) => x.classList.toggle('on', i < buf.length));
+  d.addEventListener('click', async e => {
+    const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k;
+    if (k === 'x') buf = buf.slice(0, -1); else if (buf.length < 4) buf += k; paint();
+    if (buf.length === 4) { if ((await sha(buf)) === localStorage.getItem('twh_pin')) d.remove(); else { d.classList.add('bad'); setTimeout(() => { d.classList.remove('bad'); buf = ''; paint(); }, 450); } }
+  });
+}
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = Date.now(); else if (hiddenAt && Date.now() - hiddenAt > 120000) showLock(); });
+function pinOn() {
+  ask({ title: 'رقم سري جديد', text: 'اكتب 4 أرقام.', input: '4 أرقام', itype: 'password', ok: 'التالي' }).then(p1 => {
+    if (!p1) return; if (!/^\d{4}$/.test(p1)) return toast('لازم 4 أرقام');
+    ask({ title: 'أكد الرقم', input: 'اكتب الرقم تاني', itype: 'password', ok: 'تفعيل القفل' }).then(async p2 => { if (!p2) return; if (p2 !== p1) return toast('الرقمين مش متطابقين'); localStorage.setItem('twh_pin', await sha(p1)); renderData(); toast('اتفعّل القفل'); });
+  });
+}
+function pinOff() {
+  ask({ title: 'إلغاء القفل', text: 'اكتب الرقم السري الحالي.', input: 'الرقم السري', itype: 'password', ok: 'إلغاء القفل', danger: true }).then(async p => { if (!p) return; if ((await sha(p)) !== localStorage.getItem('twh_pin')) return toast('الرقم غلط'); localStorage.removeItem('twh_pin'); renderData(); toast('اتلغى القفل'); });
+}
+function openLog() {
+  const items = (RAW.log || []).slice().reverse().slice(0, 150);
+  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel" aria-label="رجوع">${I.back}</button><h2>سجل التعديلات</h2></div><div class="ebody">${items.length ? items.map(x => `<div class="fs" style="padding:12px 16px;margin-bottom:8px"><b>${esc(x.m)}</b><br><small style="color:var(--muted)">${esc(new Date(x.t).toLocaleString('en-GB', { hour12: false }).slice(0, 17))}</small></div>`).join('') : '<div class="card info"><p>لسه مفيش تعديلات متسجلة.</p></div>'}</div>`;
+  ed = { log: true }; $('#editor').classList.add('show'); $('#editor').scrollTop = 0; history.pushState({ e: 1 }, '');
+}
+function withMonth(i, fn) {
+  const keep = D;
+  try { const m = RAW.archive[i]; D = enrich({ month: m.month, T: m.T || RAW.T, workers: m.workers }); return fn(); } finally { D = keep; }
+}
+async function attAllPresent() {
+  const s = isoToSerial(att.iso), n = D.workers.filter(w => dayStatus(w, s)).length; if (!n) return toast('مفيش تسجيلات في اليوم ده');
+  const ok = await ask({ title: 'كل العمال حاضرين', text: `هيتشال ${n} تسجيل (غياب أو إذن أو إجازة) يوم ${fmtDate(s)}.`, ok: 'تأكيد', danger: true }); if (!ok) return;
+  const snap = JSON.stringify(RAW); RAW.workers.forEach(w => { w.abs = w.abs.filter(x => x.s !== s); }); logAct('كل العمال حاضرين ' + att.iso); commit();
+  toast('كل العمال حاضرين', { label: 'تراجع', fn: () => { RAW = JSON.parse(snap); commit(); } });
+}
+function attCopyYest() {
+  const s = isoToSerial(att.iso), y = isoToSerial(shiftISO(att.iso, -1)), snap = JSON.stringify(RAW); let n = 0;
+  RAW.workers.forEach(w => { const o = w.abs.find(x => x.s === y); if (o && !w.abs.some(x => x.s === s)) { w.abs.push({ s, t: o.t, r: o.r }); n++; } });
+  if (!n) return toast('مفيش غياب مسجل أمس يتنسخ');
+  logAct('نسخ ' + n + ' تسجيل من أمس'); commit(); toast(`اتنسخ ${n} تسجيل من أمس`, { label: 'تراجع', fn: () => { RAW = JSON.parse(snap); commit(); } });
+}
+function printSheets(htmls, fit) {
+  let r = document.getElementById('printRoot'); if (!r) { r = document.createElement('div'); r.id = 'printRoot'; document.body.appendChild(r); }
+  const m = document.createElement('div'); m.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;visibility:hidden'; m.innerHTML = htmls.join(''); document.body.appendChild(m);
+  const hs = [...m.querySelectorAll('.sheet')].map(s => s.offsetHeight); m.remove();
+  r.innerHTML = htmls.map((h, i) => `<div class="pp ${fit ? 'one' : ''}" style="--z:${fit ? Math.min(.9925, 1123 / (hs[i] || 1131)).toFixed(4) : .9925}">${h}</div>`).join('');
+  document.body.classList.add('printing'); setTimeout(() => window.print(), 350);
+}
+window.addEventListener('afterprint', () => { document.body.classList.remove('printing'); const r = document.getElementById('printRoot'); if (r) r.innerHTML = ''; });
+function choose(title, opts) {
+  return new Promise(res => { const d = document.createElement('div'); d.className = 'dlg';
+    d.innerHTML = `<div class="box" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><div class="optlist">${opts.map((o, i) => `<button class="btn ghost2" data-v="${i}">${esc(o)}</button>`).join('')}<button class="btn danger" data-v="-1">إلغاء</button></div></div>`;
+    document.body.appendChild(d); d.addEventListener('click', e => { const v = e.target.dataset && e.target.dataset.v; if (v != null) { d.remove(); res(+v); } else if (e.target === d) { d.remove(); res(-1); } }); });
+}
+async function printPick() {
+  const opts = ['كل العمال (' + D.workers.length + ')', ...D.sections.map(s => 'عمال قسم ' + s), 'حزمة الإدارة: القسم كله + الأقسام + الغياب'];
+  const v = await choose('اطبع أو احفظ PDF', opts); if (v < 0) return;
+  let h;
+  if (v === 0) h = D.workers.map(w => workerCard(w));
+  else if (v <= D.sections.length) { const s = D.sections[v - 1]; h = D.workers.filter(w => w.section === s).map(w => workerCard(w)); }
+  else h = [reportCard(null), absReportCard(todayISO()), ...D.sections.map(s => reportCard(s))];
+  toast('اختار "حفظ كـ PDF" من نافذة الطباعة', { ms: 4500 }); printSheets(h, v <= D.sections.length);
+}
 
 /* ---------------- الأحداث ---------------- */
 document.addEventListener('click', e => {
@@ -671,8 +800,8 @@ document.addEventListener('click', e => {
   if (t.dataset.act === 'add') return openEditor(-1);
   if (t.dataset.act === 'check') return checkFiles();
   if (t.dataset.act === 'refreshapp') return window.hardRefresh && window.hardRefresh();
-  if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); return toast('اتحفظت النسخة الاحتياطية'); }
-  if (t.dataset.act === 'newmonth') { ask({ title: 'بدء شهر جديد', text: 'اكتب اسم الشهر الجديد.', input: 'مثال: ديسمبر 2026', ok: 'التالي' }).then(m => { if (!m) return; ask({ title: 'تأكيد', text: 'الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول.', ok: 'ابدأ الشهر الجديد', danger: true }).then(ok => { if (!ok) return; RAW.month = m; RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); }); }); return; }
+  if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); RAW.lastBackup = todayISO(); save(RAW); renderList(); return toast('اتحفظت النسخة الاحتياطية'); }
+  if (t.dataset.act === 'newmonth') { ask({ title: 'بدء شهر جديد', text: 'اكتب اسم الشهر الجديد.', input: 'مثال: ديسمبر 2026', ok: 'التالي' }).then(m => { if (!m) return; ask({ title: 'تأكيد', text: 'الشهر الحالي هيتحفظ في "الشهور السابقة" والغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول.', ok: 'ابدأ الشهر الجديد', danger: true }).then(ok => { if (!ok) return; RAW.archive = (RAW.archive || []).concat([snapshotOf(RAW)]).slice(-24); logAct('بدء شهر ' + m + ' (اتحفظ شهر ' + RAW.month + ')'); RAW.month = m; RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.hist = []; w.scores = Array(8).fill(null); }); commit('اتحفظ الشهر القديم وبدأ الشهر الجديد'); }); }); return; }
   if (t.dataset.act === 'clear') { ask({ title: 'الرجوع للبيانات الأصلية', text: 'تعديلاتك على الموبايل هتتمسح وترجع البيانات المدمجة. احفظ نسخة احتياطية الأول لو محتاجها.', ok: 'رجوع للأصل', danger: true }).then(ok => { if (ok) { localStorage.removeItem(LS); RAW = null; load(); renderAll(); toast('رجعت للبيانات الأصلية'); } }); return; }
 });
 $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; });
@@ -690,6 +819,7 @@ document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afte
 try { applyTheme(localStorage.getItem('twh_theme') || 'dark'); } catch (e) {}
 load(); renderAll(); setTab('list');
 window.__booted = true;
-window.__app = { get D() { return D; }, parseWorkbook, enrich };
+try { showLock(); } catch (e) {}
+window.__app = { get D() { return D; }, printSheets, workerCard, reportCard, absReportCard, withMonth, get RAW() { return RAW; }, parseWorkbook, enrich };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
