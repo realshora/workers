@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '11';
+const VER = '12';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -18,17 +18,17 @@ const I = {
   doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 17v-3M12 17v-6M15 17v-2"/></svg>',
   db:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>',
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
-  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
-  dl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+  dl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>',
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="3"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
   wa:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.7a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c0-.1-.2-.2-.5-.3z"/></svg>',
   user:'<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.7-4 3.7-6 7.5-6s6.8 2 7.5 6"/></svg>',
-  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3.5"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>',
   flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 5h12l-2.5 4L17 13H5"/></svg>',
   gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
   check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
-  zoom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M11 8.5v5M8.5 11h5"/></svg>',
+  zoom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2M11 8.5v5M8.5 11h5"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
 };
 
@@ -242,8 +242,8 @@ function renderList() {
   let list = D.workers.filter(w => (!state.sec || w.section === state.sec) && (!q || w.name.includes(q)));
   el.innerHTML = `
     <div class="bento"><div class="bb avg"><i class="tape"></i><span>متوسط التقييم</span><b>${fmt(st.avg)}</b></div><div class="bb"><b>${D.workers.length}</b><span>عامل</span></div><div class="bb sun"><b>${st.dec.ok}</b><span>مؤهل ويكمل</span></div></div>
-    <label class="search">${I.search}<input id="q" placeholder="ابحث باسم العامل" value="${esc(state.q)}" autocomplete="off"></label>
-    <div class="chips"><button class="fchip ${state.sec ? '' : 'on'}" data-sec="">الكل</button>${D.sections.map(s => `<button class="fchip ${state.sec === s ? 'on' : ''}" data-sec="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+    <div class="stick"><label class="search">${I.search}<input id="q" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(state.q)}" autocomplete="off"></label>
+    <div class="chips"><button class="fchip ${state.sec ? '' : 'on'}" data-sec="">الكل</button>${D.sections.map(s => `<button class="fchip ${state.sec === s ? 'on' : ''}" data-sec="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>
     <div class="list" id="wl"></div>`;
   fillWL(list);
   $('#q').addEventListener('input', e => { state.q = e.target.value; fillWL(D.workers.filter(w => (!state.sec || w.section === state.sec) && (!state.q.trim() || w.name.includes(state.q.trim())))); });
@@ -273,7 +273,7 @@ function renderData() {
   if (!D) { el.innerHTML = emptyState(); return; }
   const tm = localStorage.getItem('twh_theme') || 'dark';
   el.innerHTML = `<div class="card info"><h3>المظهر</h3><div class="seg2">${[['dark', 'داكن'], ['light', 'فاتح'], ['auto', 'تلقائي']].map(x => `<button data-th="${x[0]}" class="${tm === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div></div>
-    <div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
+    <div class="card info"><h3>الشهر الحالي</h3><input class="fin" id="monthIn" aria-label="اسم الشهر" value="${esc(D.month)}" placeholder="مثال: ديسمبر 2026"><p style="margin-top:10px">${D.workers.length} عامل، ${D.sections.length} أقسام<br>آخر تعديل: ${esc(D.importedAt || '—')}</p><div class="row2"><button class="btn" data-act="newmonth">بدء شهر جديد</button></div></div>
     <div class="card info"><h3>نسخة احتياطية</h3><p>كل تعديلاتك بتتخزن على موبايلك. احفظ نسخة من وقت للتاني عشان لو اتمسحت بيانات المتصفح أو غيرت الموبايل.</p><div class="row2"><button class="btn" data-act="backup">حفظ نسخة احتياطية</button><button class="btn ghost2" data-act="restore">استرجاع نسخة</button></div></div>
     <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button><button class="btn ghost2" data-act="check">فحص ملفات التطبيق</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
@@ -298,7 +298,7 @@ let cur = null;
 let zoomed = false;
 function fitSheet() {
   const fit = document.querySelector('#shot .fit'); if (!fit) return;
-  fit.classList.toggle('zoom', zoomed); $('#zoomBtn').classList.toggle('on', zoomed);
+  fit.classList.toggle('zoom', zoomed); $('#zoomBtn').classList.toggle('on', zoomed); const zs = $('#zoomBtn span'); if (zs) zs.textContent = zoomed ? 'تصغير' : 'تكبير';
   const sh = fit.firstElementChild, sc = zoomed ? 1 : Math.min(1, fit.clientWidth / 800);
   sh.style.transform = `scale(${sc})`; fit.style.height = Math.ceil(sh.offsetHeight * sc) + 'px';
 }
@@ -336,12 +336,13 @@ async function renderPng(node) {
   }
   throw lastErr || new Error('empty image');
 }
-function busy(on) { document.querySelectorAll('.act').forEach(b => b.disabled = on); }
+function busy(on) { document.querySelectorAll('.act').forEach(b => b.disabled = on); if (on) toast('جاري تجهيز الصورة…', { sticky: true }); else hideToast(); }
 async function withBlob(fn) {
-  busy(true);
-  try { const b = await getBlob(); if (!b) throw new Error('empty'); await fn(b); }
-  catch (e) { console.error(e); toast(e && e.message && e.message.startsWith('ملف') ? e.message : 'حصلت مشكلة في عمل الصورة، جرب تاني'); }
-  finally { busy(false); }
+  busy(true); let b;
+  try { b = await getBlob(); if (!b) throw new Error('empty'); }
+  catch (e) { busy(false); console.error(e); toast(e && e.message && e.message.startsWith('ملف') ? e.message : 'حصلت مشكلة في عمل الصورة، جرب تاني'); return; }
+  busy(false);
+  try { await fn(b); } catch (e) { console.error(e); toast('تعذّر تنفيذ العملية، جرب تاني'); }
 }
 function download(b) { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = cur.file + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
 const doSave = () => withBlob(async b => { download(b); toast('الصورة اتحفظت (في التحميلات)'); });
@@ -355,7 +356,24 @@ const doCopy = () => withBlob(async b => {
   try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); toast('الصورة اتنسخت، الصقها في أي محادثة'); }
   catch (e) { toast('المتصفح مش سامح بنسخ الصورة، استخدم حفظ'); }
 });
-let tT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('show'), 2600); }
+let tT;
+function toast(m, o = {}) {
+  const t = $('#toast'); t.innerHTML = ''; const s = document.createElement('span'); s.textContent = m; t.appendChild(s);
+  if (o.label) { const b = document.createElement('button'); b.textContent = o.label; b.onclick = () => { hideToast(); o.fn(); }; t.appendChild(b); }
+  t.classList.toggle('has-act', !!o.label); t.classList.add('show'); clearTimeout(tT);
+  if (!o.sticky) tT = setTimeout(hideToast, o.label ? 6500 : 2600);
+}
+function hideToast() { $('#toast').classList.remove('show'); }
+function ask(o) {
+  return new Promise(res => {
+    const d = document.createElement('div'); d.className = 'dlg';
+    d.innerHTML = `<div class="box" role="dialog" aria-modal="true"><h3>${esc(o.title || '')}</h3>${o.text ? `<p>${esc(o.text)}</p>` : ''}${o.input ? `<input class="fin" id="dlgIn" placeholder="${esc(o.input)}" aria-label="${esc(o.input)}" autocomplete="off">` : ''}<div class="row2"><button class="btn ${o.danger ? 'danger' : ''}" data-d="ok">${esc(o.ok || 'تأكيد')}</button><button class="btn ghost2" data-d="no">إلغاء</button></div></div>`;
+    document.body.appendChild(d);
+    const done = v => { d.remove(); res(v); };
+    d.addEventListener('click', e => { const k = e.target.dataset && e.target.dataset.d; if (k === 'ok') done(o.input ? (d.querySelector('#dlgIn').value.trim() || null) : true); else if (k === 'no' || e.target === d) done(null); });
+    const inp = d.querySelector('input'); if (inp) setTimeout(() => inp.focus(), 60);
+  });
+}
 
 /* ---------------- استيراد وتخزين ---------------- */
 function save(raw) { try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { toast('مقدرتش أحفظ البيانات على الجهاز'); } }
@@ -410,16 +428,16 @@ function openEditor(i, mode) {
   ed = { i, mode: mode || '', w: JSON.parse(JSON.stringify(base)) };
   const w = ed.w, hd = ed.mode === 'reeval' ? ' hide' : '', uniq = f => [...new Set(RAW.workers.flatMap(x => f(x)).filter(Boolean))];
   const dl = (id, arr) => `<datalist id="${id}">${arr.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
-  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : (ed.mode === 'reeval' ? 'إعادة تقييم ' : 'تعديل ') + esc(w.name)}</h2></div>
+  $('#editor').innerHTML = `<div class="pbar"><button class="back" data-e="cancel" aria-label="رجوع">${I.back}</button><h2>${i < 0 ? 'عامل جديد' : (ed.mode === 'reeval' ? 'إعادة تقييم ' : 'تعديل ') + esc(w.name)}</h2></div>
   <div class="ebody">
     <div class="fs${hd}"><h3>بيانات العامل</h3><label>الاسم<input id="eName" value="${esc(w.name)}" autocomplete="off"></label>
       <label>القسم<input id="eSec" list="dlSecs" value="${esc(w.section)}" placeholder="اختار قسم أو اكتب قسم جديد" autocomplete="off"></label>
       <div class="seg2" id="eStatus"><button data-e="status" data-v="قديم">عامل قديم</button><button data-e="status" data-v="جديد">عامل جديد</button></div></div>
     <div class="fs" id="sScores"><h3>التقييم من 1 إلى 5</h3>${CRIT.map((n, k) => `<div class="srow"><span>${n}</span><div class="nums" data-k="${k}">${[1,2,3,4,5].map(v => `<button data-e="score" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join('')}</div>
     <div class="fs${hd}"><h3>صورة العامل</h3><div class="phrow"><div class="phbox" id="phBox">${w.photo ? `<img src="${w.photo}" alt="">` : 'بدون صورة'}</div><div><label class="btn ghost2 sm" for="phFile">اختيار صورة</label><input type="file" id="phFile" accept="image/*" hidden><button class="btn danger sm" data-e="rmphoto">حذف الصورة</button></div></div></div>
-    <div class="fs${hd}"><h3>تسجيل غياب أو إذن أو إجازة</h3><input type="date" id="aDate" value="${todayISO()}"><input id="aReason" placeholder="السبب (اختياري)" autocomplete="off">
+    <div class="fs${hd}"><h3>تسجيل غياب أو إذن أو إجازة</h3><label>التاريخ<input type="date" id="aDate" value="${todayISO()}"></label><label>السبب (اختياري)<input id="aReason" placeholder="مثال: ظرف عائلي" autocomplete="off"></label>
       <div class="seg2"><button data-e="abs" data-v="غياب">غياب</button><button data-e="abs" data-v="إذن">إذن</button><button data-e="abs" data-v="إجازة">إجازة</button></div><div id="absList"></div></div>
-    <div class="fs${hd}"><h3>تسجيل مخالفة</h3><input type="date" id="vDate" value="${todayISO()}"><input id="vType" list="dlTypes" placeholder="نوع المخالفة" autocomplete="off"><textarea id="vDet" rows="2" placeholder="التفاصيل"></textarea><input id="vAct" list="dlActs" placeholder="الإجراء، مثال: إنذار شفهي" autocomplete="off">
+    <div class="fs${hd}"><h3>تسجيل مخالفة</h3><label>التاريخ<input type="date" id="vDate" value="${todayISO()}"></label><label>نوع المخالفة<input id="vType" list="dlTypes" placeholder="مثال: تأخير" autocomplete="off"></label><label>التفاصيل<textarea id="vDet" rows="2" placeholder="اختياري"></textarea></label><label>الإجراء<input id="vAct" list="dlActs" placeholder="مثال: إنذار شفهي" autocomplete="off"></label>
       <button class="btn" data-e="addvio" style="margin-top:10px">إضافة المخالفة</button><div id="vioList"></div></div>
     ${i >= 0 && !ed.mode ? '<button class="btn danger" data-e="del" style="width:100%">حذف العامل</button>' : ''}
   </div>
@@ -474,10 +492,7 @@ $('#editor').addEventListener('click', e => {
     if (ed.i < 0) RAW.workers.push(ed.w); else RAW.workers[ed.i] = ed.w;
     const isNew = ed.i < 0; commit(isNew ? 'اتضاف العامل' : 'اتحفظت التعديلات'); return history.back();
   }
-  if (k === 'del' && confirm(`تحذف ${ed.w.name} نهائيًا؟`)) {
-    RAW.workers.splice(ed.i, 1); skipRefresh = true; commit('اتحذف العامل'); skipRefresh = false;
-    history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150);
-  }
+  if (k === 'del') return removeWorker(ed.i, true);
 });
 document.addEventListener('change', e => { if (e.target.id === 'monthIn') { const m = e.target.value.trim(); if (m) { RAW.month = m; commit('اتحدّث الشهر'); } } });
 
@@ -485,7 +500,7 @@ document.addEventListener('change', e => { if (e.target.id === 'monthIn') { cons
 const att = { iso: todayISO(), type: 'غياب', sec: '', q: '' };
 const vst = { iso: todayISO(), sel: new Set(), sec: '', q: '', type: '', detail: '', action: '' };
 const shiftISO = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, d + n)); return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`; };
-const dsel = (key, iso) => `<div class="dsel"><button data-dd="${key}:-1" aria-label="اليوم السابق">${I.back}</button><label><input type="date" data-dk="${key}" value="${iso}"><b>${fmtDate(isoToSerial(iso))}</b><small>${iso === todayISO() ? 'النهارده' : 'دوس هنا لتغيير التاريخ'}</small></label><button data-dd="${key}:1" class="flip" aria-label="اليوم التالي">${I.back}</button></div>`;
+const dsel = (key, iso) => `<div class="dsel"><button data-dd="${key}:-1" aria-label="اليوم السابق">${I.back}</button><label><input type="date" aria-label="اختيار التاريخ" data-dk="${key}" value="${iso}"><b>${fmtDate(isoToSerial(iso))}</b><small>${iso === todayISO() ? 'النهارده' : 'دوس هنا لتغيير التاريخ'}</small></label><button data-dd="${key}:1" class="flip" aria-label="اليوم التالي">${I.back}</button></div>`;
 const dayStatus = (w, s) => { const a = w.abs.find(x => x.s === s); return a ? a.t : ''; };
 const secChips = (attr, cur) => `<div class="chips"><button class="fchip ${cur ? '' : 'on'}" ${attr}="">الكل</button>${D.sections.map(s => `<button class="fchip ${cur === s ? 'on' : ''}" ${attr}="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
 
@@ -498,8 +513,8 @@ function renderAtt() {
     <div class="tcards">${['غياب', 'إذن', 'إجازة'].map(t => `<button class="tcard tone-${tn[t]} ${att.type === t ? 'on' : ''}" data-at="${t}"><b>${cnt[t]}</b><span>${t} ${att.iso === todayISO() ? 'اليوم' : ''}</span></button>`).join('')}</div>
     <div class="hint">حاليًا بتسجّل <b>${att.type}</b> ${day}: دوس على اسم العامل من القايمة تحت. دوسة تانية بتشيله. باقي العمال بيتحسبوا حاضرين (${D.workers.length - cnt['غياب'] - cnt['إذن'] - cnt['إجازة']} حاضر).</div>
     <div class="h2" id="attRecTitle"></div><div class="dchips" id="attChips" style="margin-bottom:12px"></div>
-    <label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
-    ${secChips('data-asec', att.sec)}<div class="list" id="attRows"></div>
+    <div class="stick"><label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
+    ${secChips('data-asec', att.sec)}</div><div class="list" id="attRows"></div>
     <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي (صورة)</button>`;
   fillAtt(); $('#aq').addEventListener('input', e => { att.q = e.target.value; fillAtt(); });
 }
@@ -513,9 +528,10 @@ function fillAtt() {
     return `<button class="arow tone-${tone} ${t ? 'is' : 'pres'}" data-aw="${w.id}"><div class="chk">${t ? I.check : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div>${t ? `<div class="stp">${t}</div>` : ''}</button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
 }
 function tapAtt(id) {
-  const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s);
+  const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s), prev = JSON.stringify(w.abs);
   w.abs = w.abs.filter(x => x.s !== s); if (!(old && old.t === att.type)) w.abs.push({ s, t: att.type });
-  const y = window.scrollY; commit(); window.scrollTo(0, y);
+  const y = window.scrollY, removed = old && old.t === att.type; commit(); window.scrollTo(0, y);
+  toast(removed ? 'اتشال تسجيل ' + w.name : w.name + ': ' + att.type, { label: 'تراجع', fn: () => { RAW.workers[id].abs = JSON.parse(prev); const y2 = window.scrollY; commit(); window.scrollTo(0, y2); } });
 }
 
 function renderVio() {
@@ -528,10 +544,10 @@ function renderVio() {
     <div class="h2">مخالفات اليوم (${log.length})</div>
     ${log.length ? log.map(x => `<div class="ve"><div><b>${esc(x.w.name)}</b><br><small>${esc(x.v.type)}${x.v.action ? '، ' + esc(x.v.action) : ''}</small>${x.v.detail ? `<p>${esc(x.v.detail)}</p>` : ''}</div><button data-vd="${x.w.id}:${x.n}">×</button></div>`).join('') : '<div class="card info"><p>مفيش مخالفات متسجلة في اليوم ده.</p></div>'}
     <div class="h2">١. اكتب المخالفة</div>
-    <div class="card info vform"><input id="vt" list="dlT" placeholder="نوع المخالفة" value="${esc(vst.type)}" autocomplete="off"><textarea id="vd" rows="2" placeholder="التفاصيل">${esc(vst.detail)}</textarea><input id="va" list="dlA" placeholder="الإجراء، مثال: إنذار شفهي" value="${esc(vst.action)}" autocomplete="off"></div>${dl('dlT', uniq(v => v.type))}${dl('dlA', uniq(v => v.action))}
+    <div class="card info vform"><label>نوع المخالفة<input id="vt" list="dlT" placeholder="مثال: تأخير" value="${esc(vst.type)}" autocomplete="off"></label><label>التفاصيل<textarea id="vd" rows="2" placeholder="اختياري">${esc(vst.detail)}</textarea></label><label>الإجراء<input id="va" list="dlA" placeholder="مثال: إنذار شفهي" value="${esc(vst.action)}" autocomplete="off"></label></div>${dl('dlT', uniq(v => v.type))}${dl('dlA', uniq(v => v.action))}
     <div class="h2">٢. اختار العمال اللي عملوا المخالفة</div>
-    <label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل" value="${esc(vst.q)}" autocomplete="off"></label>
-    ${secChips('data-vsec', vst.sec)}<div class="list" id="vioRows"></div>
+    <div class="stick"><label class="search">${I.search}<input id="vq" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(vst.q)}" autocomplete="off"></label>
+    ${secChips('data-vsec', vst.sec)}</div><div class="list" id="vioRows"></div>
     <button class="btn" data-act="viorep" style="width:100%;margin-top:14px">تقرير المخالفات اليومي</button>`;
   fillVio();
   $('#vt').addEventListener('input', e => vst.type = e.target.value); $('#vd').addEventListener('input', e => vst.detail = e.target.value); $('#va').addEventListener('input', e => vst.action = e.target.value);
@@ -587,11 +603,14 @@ async function checkFiles() {
   await Promise.all(APP_FILES.map(async f => { try { const r = await fetch(f + '?chk=' + Date.now(), { cache: 'no-store' }); if (!r.ok) miss.push(f); } catch (e) { miss.push(f); } }));
   alert(miss.length ? 'الملفات دي مش مرفوعة على GitHub:\n' + miss.join('\n') + '\n\nارفعها في نفس مكان index.html.' : 'كل ملفات التطبيق موجودة وتمام (' + APP_FILES.length + ' ملف).');
 }
-function deleteWorker(i) {
-  const w = RAW.workers[i]; if (!w || !confirm(`تحذف ${w.name} نهائيًا؟`)) return;
-  RAW.workers.splice(i, 1); skipRefresh = true; commit('اتحذف ' + w.name); skipRefresh = false;
-  if (cur && cur.wid != null) history.back();
+async function removeWorker(i, fromEditor) {
+  const w = RAW.workers[i]; if (!w) return;
+  const ok = await ask({ title: 'حذف ' + w.name, text: 'هيتحذف العامل مع كل غيابه ومخالفاته وتقييمه.', ok: 'حذف', danger: true }); if (!ok) return;
+  const snap = JSON.stringify(RAW); RAW.workers.splice(i, 1); skipRefresh = true; commit(); skipRefresh = false;
+  if (fromEditor) { history.back(); setTimeout(() => { if ($('#page').classList.contains('show')) history.back(); }, 150); } else if (cur && cur.wid != null) history.back();
+  toast('اتحذف ' + w.name, { label: 'تراجع', fn: () => { RAW = JSON.parse(snap); commit('رجع ' + w.name); } });
 }
+const deleteWorker = i => removeWorker(i, false);
 document.addEventListener('click', e => {
   const w2 = e.target.closest('[data-w2]');
   if (w2 && cur && cur.wid != null) { const k = w2.dataset.w2; return k === 'reeval' ? openEditor(cur.wid, 'reeval') : k === 'edit' ? openEditor(cur.wid) : deleteWorker(cur.wid); }
@@ -629,8 +648,8 @@ document.addEventListener('click', e => {
   if (t.dataset.act === 'check') return checkFiles();
   if (t.dataset.act === 'refreshapp') return window.hardRefresh && window.hardRefresh();
   if (t.dataset.act === 'backup') { const b = new Blob([JSON.stringify(RAW)], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `نسخة ملفات العمال ${todayISO()}.json`; document.body.appendChild(l); l.click(); l.remove(); return toast('اتحفظت النسخة الاحتياطية'); }
-  if (t.dataset.act === 'newmonth') { const m = prompt('اسم الشهر الجديد، مثال: ديسمبر 2026'); if (m && m.trim() && confirm('الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول. نكمل؟')) { RAW.month = m.trim(); RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); } return; }
-  if (t.dataset.act === 'clear' && confirm('ترجع للبيانات الأصلية المدمجة في التطبيق؟')) { localStorage.removeItem(LS); RAW = null; load(); renderAll(); toast('رجعت للبيانات الأصلية'); }
+  if (t.dataset.act === 'newmonth') { ask({ title: 'بدء شهر جديد', text: 'اكتب اسم الشهر الجديد.', input: 'مثال: ديسمبر 2026', ok: 'التالي' }).then(m => { if (!m) return; ask({ title: 'تأكيد', text: 'الغياب والمخالفات والتقييمات هتتصفّر لكل العمال. الأفضل تحفظ نسخة احتياطية الأول.', ok: 'ابدأ الشهر الجديد', danger: true }).then(ok => { if (!ok) return; RAW.month = m; RAW.workers.forEach(w => { w.abs = []; w.vio = []; w.scores = Array(8).fill(null); }); commit('بدأ الشهر الجديد'); }); }); return; }
+  if (t.dataset.act === 'clear') { ask({ title: 'الرجوع للبيانات الأصلية', text: 'تعديلاتك على الموبايل هتتمسح وترجع البيانات المدمجة. احفظ نسخة احتياطية الأول لو محتاجها.', ok: 'رجوع للأصل', danger: true }).then(ok => { if (ok) { localStorage.removeItem(LS); RAW = null; load(); renderAll(); toast('رجعت للبيانات الأصلية'); } }); return; }
 });
 $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; });
 $('#back').addEventListener('click', () => history.back());
@@ -640,7 +659,7 @@ $('#zoomBtn').addEventListener('click', () => { zoomed = !zoomed; fitSheet(); to
 $('#editBtn').addEventListener('click', () => { if (cur && cur.wid != null) openEditor(cur.wid); });
 $('#editBtn').innerHTML = I.edit;
 $('#bSave').addEventListener('click', doSave); $('#bWa').addEventListener('click', doShare); $('#bCopy').addEventListener('click', doCopy);
-$('#back').innerHTML = I.back; $('.gear').insertAdjacentHTML('afterbegin', I.gear); $('#zoomBtn').innerHTML = I.zoom; $('#vioGo').textContent = '';
+$('#back').innerHTML = I.back; $('.gear').insertAdjacentHTML('afterbegin', I.gear); $('#zoomBtn').innerHTML = I.zoom + '<span>تكبير</span>'; $('#vioGo').textContent = '';
 $('#bSave').insertAdjacentHTML('afterbegin', I.dl); $('#bWa').insertAdjacentHTML('afterbegin', I.wa); $('#bCopy').insertAdjacentHTML('afterbegin', I.copy);
 document.querySelectorAll('.nav button').forEach(b => b.insertAdjacentHTML('afterbegin', I[b.dataset.icon]));
 
