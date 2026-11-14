@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '12';
+const VER = '13';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -264,7 +264,8 @@ function renderReports() {
   if (!D) { el.innerHTML = emptyState(); return; }
   const all = stats(D.workers);
   const card = (title, sub, st, hue, icon, attr) => `<button class="rep tone-${toneOf(st.avg)}" ${attr} ><div class="ic">${icon}</div><div class="tx"><b>${esc(title)}</b><small>${sub}</small></div><div class="av2">${fmt(st.avg)}</div></button>`;
-  el.innerHTML = `<div class="list">${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}</div>
+  const absToday = D.workers.filter(w => dayStatus(w, isoToSerial(att.iso)) === 'غياب').length;
+  el.innerHTML = `<div class="list">${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}<button class="rep tone-${absToday ? 'bad' : 'ok'}" data-act="absrep"><div class="ic">${I.cal}</div><div class="tx"><b>تقرير الغياب للإدارة</b><small>غياب اليوم والإجمالي الشهري من الأكثر للأقل</small></div><div class="av2">${absToday}</div></button></div>
     <div class="h2">تقارير الأقسام (كل قسم لوحده)</div>
     <div class="list">${D.sections.map((s, i) => { const l = D.workers.filter(w => w.section === s), st = stats(l); return card(s, `${st.n} عمال، ${st.dec.ok} مؤهل، ${st.dec.warn} متابعة`, st, HUES[i % HUES.length], I.doc, `data-r="${esc(s)}"`); }).join('')}</div>`;
 }
@@ -515,7 +516,8 @@ function renderAtt() {
     <div class="h2" id="attRecTitle"></div><div class="dchips" id="attChips" style="margin-bottom:12px"></div>
     <div class="stick"><label class="search">${I.search}<input id="aq" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(att.q)}" autocomplete="off"></label>
     ${secChips('data-asec', att.sec)}</div><div class="list" id="attRows"></div>
-    <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي (صورة)</button>`;
+    <button class="btn" data-act="attrep" style="width:100%;margin-top:14px">تقرير الحضور اليومي (صورة)</button>
+    <button class="btn ghost2" data-act="absrep" style="width:100%;margin-top:10px">تقرير الغياب للإدارة (اليوم والشهر)</button>`;
   fillAtt(); $('#aq').addEventListener('input', e => { att.q = e.target.value; fillAtt(); });
 }
 function fillAtt() {
@@ -585,6 +587,27 @@ function attReportCard(iso) {
     ranks: [{ v: pct + '%', l: 'نسبة الحضور' }, { v: total, l: 'إجمالي العمال' }], tiles: [[A.length, 'غياب'], [P.length, 'إذن'], [L.length, 'إجازة'], [present, 'حاضر']],
     title: 'تقرير الحضور اليومي', name: fmtDate(s), tags: [total + ' عامل'], body });
 }
+function absReportCard(iso) {
+  const s = isoToSerial(iso), total = D.workers.length, isToday = iso === todayISO();
+  const st = D.workers.map(w => { const ab = w.abs.filter(x => x.s <= s), c = t => ab.filter(x => x.t === t).length; return { w, a: c('غياب'), p: c('إذن'), l: c('إجازة'), day: dayStatus(w, s) }; });
+  const by = (x, y) => x.w.name.localeCompare(y.w.name, 'ar');
+  const today = st.filter(x => x.day === 'غياب').sort((x, y) => y.a - x.a || by(x, y));
+  const permT = st.filter(x => x.day === 'إذن').length, leaveT = st.filter(x => x.day === 'إجازة').length;
+  const present = total - today.length - permT - leaveT, pct = total ? Math.round(today.length / total * 100) : 0;
+  const month = st.filter(x => x.a > 0).sort((x, y) => y.a - x.a || y.p - x.p || by(x, y));
+  const sumDays = st.reduce((p, x) => p + x.a, 0);
+  const hot = n => ({ h: n, c: n >= 3 ? 'n hot' : 'n' });
+  const todayRows = today.map(x => tr([esc(x.w.name), esc(x.w.section), { h: esc((x.w.abs.find(y => y.s === s) || {}).r || '—'), c: 'mut' }, hot(x.a)]));
+  const monthRows = month.map((x, i) => tr([{ h: i + 1, c: 'n' }, esc(x.w.name), esc(x.w.section), hot(x.a), { h: x.p, c: 'n' }, { h: x.l, c: 'n' }]));
+  const secRows = D.sections.map(sec => { const l = st.filter(x => x.w.section === sec); return tr([esc(sec), { h: l.filter(x => x.day === 'غياب').length, c: 'n' }, { h: l.reduce((p, x) => p + x.a, 0), c: 'n' }]); });
+  const body = H(`الغياب ${isToday ? 'اليوم' : 'في اليوم ده'} (${today.length})`) + tbl([['العامل'], ['القسم', '27%'], ['السبب', '16%'], ['الإجمالي', '17%', 'n']], todayRows, 'لا يوجد غياب')
+    + H('ترتيب الغياب خلال الشهر، من الأكثر للأقل') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '26%'], ['غياب', '11%', 'n'], ['إذن', '10%', 'n'], ['إجازة', '12%', 'n']], monthRows, 'لا يوجد غياب مسجل')
+    + H('الغياب حسب القسم') + tbl([['القسم'], ['اليوم', '18%', 'n'], ['الشهر', '18%', 'n']], secRows);
+  return sheetFrame({ tone: pct >= 15 ? 'bad' : today.length ? 'warn' : 'ok', score: today.length, unit: 'غايب من ' + total, pill: today.length ? `نسبة الغياب <bdi dir="ltr">${pct}%</bdi>` : 'مفيش غياب',
+    ranks: [{ v: sumDays, l: 'إجمالي أيام الغياب' }, { v: month.length, s: total + ' /', l: 'عمال لهم غياب' }],
+    tiles: [[today.length, 'غياب'], [permT, 'إذن'], [leaveT, 'إجازة'], [present, 'حاضر']],
+    title: 'تقرير الغياب', name: fmtDate(s), tags: ['الإجمالي حتى هذا اليوم', total + ' عامل'], body });
+}
 function vioReportCard(iso) {
   const s = isoToSerial(iso), list = [];
   D.workers.forEach(w => w.vio.forEach(v => { if (v.s === s) list.push({ w, v }); }));
@@ -626,6 +649,7 @@ document.addEventListener('click', e => {
   if (d.vsec != null) { vst.sec = d.vsec; return renderVio(); }
   if (d.vd) { const [id, n] = d.vd.split(':').map(Number); RAW.workers[id].vio.splice(n, 1); return commit('اتمسحت المخالفة'); }
   if (t.id === 'vioGo') return registerVio();
+  if (d.act === 'absrep') return openPage('تقرير الغياب', absReportCard(att.iso), `غياب ${fmtDate(isoToSerial(att.iso))}`);
   if (d.act === 'attrep') return openPage('تقرير الحضور', attReportCard(att.iso), `حضور ${fmtDate(isoToSerial(att.iso))}`);
   if (d.act === 'viorep') return openPage('تقرير المخالفات', vioReportCard(vst.iso), `مخالفات ${fmtDate(isoToSerial(vst.iso))}`);
 });

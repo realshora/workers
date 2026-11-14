@@ -327,3 +327,6 @@ body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
 #zoomBtn{width:auto;padding:0 16px;gap:8px;border-radius:99px;display:flex;font-size:14px;}#zoomBtn svg{width:20px;height:20px;}
 
 .btn.danger{color:#FF93A5;}[data-theme=light] .btn.danger{color:var(--bad);}
+
+.sheet .rs-t td.hot{color:#C22A4A;font-weight:800;}
+.sheet .rs-t td.n,.sheet .rs-t th.n{white-space:nowrap;padding-left:6px;padding-right:6px;}
