@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '14';
+const VER = '15';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -168,7 +168,28 @@ const foot = () => `<div class="sfoot">AL-TAWHEED EGYPT</div>`;
 /* ---------------- قالب التقارير الموحّد (ورقة A4) ---------------- */
 const TC = { ok: '#2FBF8A', warn: '#F5A031', bad: '#F0506E', none: '#CBB9A0' };
 const cTone = v => v == null ? 'none' : v >= 4 ? 'ok' : v >= 3 ? 'warn' : 'bad';
-function sheetFrame(o) {
+function fitPage(html) {
+  const host = document.createElement('div'); host.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;visibility:hidden'; host.innerHTML = html; document.body.appendChild(host);
+  const sheet = host.querySelector('.sheet'), main = sheet.querySelector('.rs-main'); sheet.classList.add('a4');
+  const sign = main.querySelector('.rs-sign');
+  const over = () => { if (sign) sign.style.marginTop = '0'; const kids = [...main.children], last = kids[kids.length - 1], bottom = last.getBoundingClientRect().bottom + parseFloat(getComputedStyle(last).marginBottom), nat = bottom - main.getBoundingClientRect().top + parseFloat(getComputedStyle(main).paddingBottom); if (sign) sign.style.marginTop = ''; return nat > 1131 - 8; };
+  for (const lv of ['c1', 'c2']) { if (!over()) break; sheet.classList.add(lv); }
+  let guard = 80;
+  while (over() && guard--) {
+    const pri = t => +(t.dataset.p ?? 1), cnt = t => [...t.tBodies[0].rows].filter(r => !r.classList.contains('more')).length;
+    const tbls = [...main.querySelectorAll('table.rs-t')].filter(t => pri(t) !== 0 && cnt(t) > (pri(t) === 2 ? 2 : 3));
+    if (!tbls.length) break;
+    const t = tbls.reduce((p, q) => (pri(q) > pri(p) || (pri(q) === pri(p) && cnt(q) > cnt(p))) ? q : p), tb = t.tBodies[0];
+    let more = tb.querySelector('tr.more');
+    if (!more) { more = document.createElement('tr'); more.className = 'more'; const td = document.createElement('td'); td.colSpan = t.tHead.rows[0].cells.length; td.className = 'mut'; td.style.textAlign = 'center'; more.appendChild(td); tb.appendChild(more); t.dataset.hid = '0'; }
+    const data = [...tb.rows].filter(r => r !== more);
+    data[data.length - 1].remove(); t.dataset.hid = String(+t.dataset.hid + 1);
+    more.firstChild.textContent = 'و ' + t.dataset.hid + ' آخرين (الكل في تصدير Excel)';
+  }
+  const out = sheet.outerHTML; host.remove(); return `<div class="fit">${out}</div>`;
+}
+const sheetFrame = o => fitPage(sheetFrameRaw(o));
+function sheetFrameRaw(o) {
   const nm = String(o.name || '');
   return `<div class="fit"><div class="sheet tone-${o.tone}">
     <aside class="sd"><div class="sd-top"><div class="sd-logo"><img src="logo-emblem.png" alt=""></div><h3>التوحيد إيجيبت</h3><small>AL-TAWHEED EGYPT</small>
@@ -184,7 +205,7 @@ function sheetFrame(o) {
 }
 const H = t => `<div class="rs-h">${t}</div>`;
 const tr = cells => `<tr>${cells.map(c => typeof c === 'object' ? `<td class="${c.c || ''}">${c.h}</td>` : `<td>${c}</td>`).join('')}</tr>`;
-const tbl = (cols, rows, empty) => `<table class="rs-t"><colgroup>${cols.map(c => `<col${c[1] ? ` style="width:${c[1]}"` : ''}>`).join('')}</colgroup><thead><tr>${cols.map(c => `<th${c[2] ? ` class="${c[2]}"` : ''}>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${cols.length}" class="mut" style="text-align:center">${empty || '—'}</td></tr>`}</tbody></table>`;
+const tbl = (cols, rows, empty, pr) => `<table class="rs-t"${pr != null ? ` data-p="${pr}"` : ''}><colgroup>${cols.map(c => `<col${c[1] ? ` style="width:${c[1]}"` : ''}>`).join('')}</colgroup><thead><tr>${cols.map(c => `<th${c[2] ? ` class="${c[2]}"` : ''}>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.join('') : `<tr><td colspan="${cols.length}" class="mut" style="text-align:center">${empty || '—'}</td></tr>`}</tbody></table>`;
 const critGrid = (vals, cont) => `<div class="rs-cr">${CRIT.map((n, k) => { const v = vals[k], t = cTone(v);
   const bar = cont ? `<div class="bc"><i style="width:${v == null ? 0 : v / 5 * 100}%"></i></div>` : `<div class="seg3">${[1, 2, 3, 4, 5].map(x => `<i class="${v != null && x <= v ? 'on' : ''}"></i>`).join('')}</div>`;
   return `<div class="rs-c c-${t}"><div class="t"><span>${n}</span><b>${v == null ? '—' : fmt(Math.round(v * 10) / 10)}</b></div>${bar}</div>`; }).join('')}</div>`;
@@ -212,34 +233,35 @@ function workerCard(w) {
     title: 'تقرير تقييم الأداء الشهري', name: w.name, tags: [w.section, w.status ? 'عامل ' + w.status : ''], photo: w.photo,
     alert: [w.alerts.length ? 'درجة منخفضة في ' + w.alerts.join(' و ') : '', ...w.absFlags].filter(Boolean).length ? 'تنبيه: ' + [w.alerts.length ? 'درجة منخفضة في ' + w.alerts.join(' و ') : '', ...w.absFlags].filter(Boolean).join('، ') : '',
     body: H('التقييم التفصيلي') + (w.complete ? critGrid(w.scores, false) + rsIns(w.scores, 'أقوى نقطة', 'محتاج تحسين') : '<div class="rs-none">لم يتم إدخال تقييم هذا الشهر</div>')
-      + trendHtml(w) + H('سجل الغياب والإذن والإجازات') + tbl([['التاريخ', '34%'], ['النوع', '20%'], ['السبب']], abs.map(x => tr([fmtDate(x.s), x.t, { h: esc(x.r || '—'), c: 'mut' }])), 'لا يوجد غياب أو إذن أو إجازة')
-      + H('المخالفات') + tbl([['التاريخ', '30%'], ['سبب المخالفة'], ['الإجراء', '22%']], vio.map(x => tr([fmtDate(x.s), esc(x.type) + (x.detail ? ': ' + esc(x.detail) : ''), { h: esc(x.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة') + (w.note ? H('ملاحظات') + `<div class="rs-note">${esc(w.note)}</div>` : '') });
+      + trendHtml(w) + H('سجل الغياب والإذن والإجازات') + tbl([['التاريخ', '34%'], ['النوع', '20%'], ['السبب']], abs.map(x => tr([fmtDate(x.s), x.t, { h: esc(x.r || '—'), c: 'mut' }])), 'لا يوجد غياب أو إذن أو إجازة', 1)
+      + H('المخالفات') + tbl([['التاريخ', '30%'], ['سبب المخالفة'], ['الإجراء', '22%']], vio.map(x => tr([fmtDate(x.s), esc(x.type) + (x.detail ? ': ' + esc(x.detail) : ''), { h: esc(x.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة', 1) + (w.note ? H('ملاحظات') + `<div class="rs-note">${esc(w.note)}</div>` : '') });
 }
 
 /* ---------------- تقرير القسم / القسم كله ---------------- */
 function reportCard(sec) {
   const list = sec ? D.workers.filter(w => w.section === sec) : D.workers;
   const st = stats(list), tone = toneOf(st.avg), sorted = list.slice().sort(byRank), best = sorted.find(w => w.avg != null);
-  const needs = list.filter(w => w.alerts.length || w.cntVio || w.cntAbs >= 3).sort(byRank);
-  const needRows = needs.map(w => tr([esc(w.name), { h: [w.alerts.length ? 'درجة منخفضة: ' + w.alerts.join(' و ') : '', w.cntVio ? 'مخالفات: ' + w.cntVio : '', w.cntAbs >= 3 ? 'غياب: ' + w.cntAbs + ' أيام' : ''].filter(Boolean).join('، '), c: 'mut' }]));
+  const needs = list.filter(w => w.alerts.length || w.cntVio || w.cntAbs >= 3 || w.absFlags.length).sort(byRank);
+  const needRows = needs.map(w => tr([{ h: esc(w.name), c: 'nm' }, { h: [w.alerts.length ? 'درجة منخفضة: ' + w.alerts.join(' و ') : '', w.cntVio ? 'مخالفات: ' + w.cntVio : '', w.cntAbs >= 3 ? 'غياب: ' + w.cntAbs + ' أيام' : ''].filter(Boolean).join('، '), c: 'mut' }]));
   const rk = w => sec ? w.srank : w.rank;
-  const wRow = (w, withSec) => tr([{ h: rk(w) ?? '—', c: 'n' }, esc(w.name)].concat(withSec ? [esc(w.section)] : []).concat([{ h: fmt(w.avg), c: 'n' }].concat(withSec ? [] : [{ h: w.cntAbs, c: 'n' }, { h: w.cntVio, c: 'n' }])));
-  let body = H('متوسط الجوانب') + critGrid(st.crit, true) + rsIns(st.crit, 'أقوى جانب', 'أضعف جانب') + H('قرارات التقييم') + distBar(st);
-  if (sec) body += H('ترتيب العمال') + tbl([['#', '10%', 'n'], ['العامل'], ['المتوسط', '16%', 'n'], ['غياب', '14%', 'n'], ['مخالفات', '16%', 'n']], sorted.map(w => wRow(w, false)));
+  const wRow = (w, mode) => tr([{ h: rk(w) ?? '—', c: 'n' }, { h: esc(w.name), c: 'nm' }].concat(mode === 'sec' ? [esc(w.section)] : []).concat([{ h: fmt(w.avg), c: 'n' }]).concat(mode ? [] : [{ h: w.cntAbs, c: 'n' }, { h: w.cntVio, c: 'n' }]));
+  let body;
+  if (sec) body = H('متوسط الجوانب') + critGrid(st.crit, true) + rsIns(st.crit, 'أقوى جانب', 'أضعف جانب')
+    + H('ترتيب العمال') + tbl([['#', '10%', 'n'], ['العامل'], ['المتوسط', '16%', 'n'], ['غياب', '14%', 'n'], ['مخالفات', '16%', 'n']], sorted.map(w => wRow(w, false)), '', 1);
   else {
     const secs = D.sections.map(s => { const l = D.workers.filter(w => w.section === s); return { s, st: stats(l) }; }).sort((x, y) => (y.st.avg ?? -1) - (x.st.avg ?? -1));
-    const ev = sorted.filter(w => w.avg != null);
-    body += H('مقارنة الأقسام') + tbl([['القسم'], ['العمال', '12%', 'n'], ['المتوسط', '15%', 'n'], ['مؤهل', '12%', 'n'], ['غياب', '12%', 'n'], ['مخالفات', '14%', 'n']], secs.map(x => tr([esc(x.s), { h: x.st.n, c: 'n' }, { h: fmt(x.st.avg), c: 'n' }, { h: x.st.dec.ok, c: 'n' }, { h: x.st.abs, c: 'n' }, { h: x.st.vio, c: 'n' }])))
-      + H('الأعلى تقييمًا') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '28%'], ['المتوسط', '16%', 'n']], ev.slice(0, 5).map(w => wRow(w, true)))
-      + H('الأقل تقييمًا') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '28%'], ['المتوسط', '16%', 'n']], ev.slice(-5).reverse().map(w => wRow(w, true)));
+    const ev = sorted.filter(w => w.avg != null), cols = [['#', '14%', 'n'], ['العامل'], ['المتوسط', '24%', 'n']];
+    body = rsIns(st.crit, 'أقوى جانب', 'أضعف جانب')
+      + H('مقارنة الأقسام') + tbl([['القسم'], ['العمال', '12%', 'n'], ['المتوسط', '15%', 'n'], ['مؤهل', '12%', 'n'], ['غياب', '12%', 'n'], ['مخالفات', '14%', 'n']], secs.map(x => tr([esc(x.s), { h: x.st.n, c: 'n' }, { h: fmt(x.st.avg), c: 'n' }, { h: x.st.dec.ok, c: 'n' }, { h: x.st.abs, c: 'n' }, { h: x.st.vio, c: 'n' }])), '', 0)
+      + H('الأعلى والأقل تقييمًا') + `<div class="rs-two"><div><div class="rs-sub">الأعلى تقييمًا</div>${tbl(cols, ev.slice(0, 5).map(w => wRow(w, 'two')), '', 1)}</div><div><div class="rs-sub">الأقل تقييمًا</div>${tbl(cols, ev.slice(-5).reverse().map(w => wRow(w, 'two')), '', 1)}</div></div>`;
   }
-  body += H('تنبيهات ومتابعة') + tbl([['العامل', '34%'], ['الملاحظة']], needRows, 'لا توجد تنبيهات أو مخالفات');
+  if (sec) body += H('تنبيهات ومتابعة') + tbl([['العامل', '34%'], ['الملاحظة']], needRows, 'لا توجد تنبيهات أو مخالفات', 2);
   return sheetFrame({ tone, score: fmt(st.avg), unit: 'من 5', pill: sec ? 'متوسط القسم' : 'متوسط التجهيز',
     sub: best ? `<div class="sd-prev">الأعلى: ${esc(best.name)} (${fmt(best.avg)})</div>` : '',
     ranks: [{ v: st.n, l: 'عدد العمال' }, { v: st.dec.ok, s: st.n + ' /', l: 'مؤهل ويكمل' }],
     tiles: [[st.abs, 'غياب'], [st.perm, 'إذن'], [st.leave, 'إجازة'], [st.vio, 'مخالفات']],
     title: sec ? 'تقرير أداء القسم الشهري' : 'تقرير الأداء الشهري لقسم التجهيز', name: sec ? 'قسم ' + sec : 'قسم التجهيز كامل',
-    tags: [st.n + ' عامل', sec ? '' : D.sections.length + ' أقسام', st.dec.none ? st.dec.none + ' لم يُقيَّم' : ''], body });
+    tags: [st.n + ' عامل', sec ? '' : D.sections.length + ' أقسام', st.dec.ok ? st.dec.ok + ' مؤهل' : '', st.dec.warn ? st.dec.warn + ' متابعة' : '', st.dec.bad ? st.dec.bad + ' تدريب' : '', st.dec.none ? st.dec.none + ' لم يُقيَّم' : ''], body });
 }
 
 /* ---------------- الشاشات الرئيسية ---------------- */
@@ -621,8 +643,8 @@ function attReportCard(iso) {
   const A = by('غياب'), P = by('إذن'), L = by('إجازة'), present = total - A.length - P.length - L.length, pct = total ? Math.round(present / total * 100) : 0;
   const secRows = D.sections.map(sec => { const l = D.workers.filter(w => w.section === sec), c = t => l.filter(w => dayStatus(w, s) === t).length, a1 = c('غياب'), p1 = c('إذن'), l1 = c('إجازة');
     return tr([esc(sec), { h: l.length - a1 - p1 - l1, c: 'n' }, { h: a1, c: 'n' }, { h: p1, c: 'n' }, { h: l1, c: 'n' }]); });
-  const lst = (title, arr) => arr.length ? H(`${title} (${arr.length})`) + tbl([['العامل'], ['القسم', '30%'], ['السبب', '28%']], arr.map(w => tr([esc(w.name), esc(w.section), { h: esc((w.abs.find(x => x.s === s) || {}).r || '—'), c: 'mut' }]))) : '';
-  const body = H('الحضور حسب القسم') + tbl([['القسم'], ['حاضر', '14%', 'n'], ['غياب', '14%', 'n'], ['إذن', '14%', 'n'], ['إجازة', '14%', 'n']], secRows)
+  const lst = (title, arr) => arr.length ? H(`${title} (${arr.length})`) + tbl([['العامل'], ['القسم', '30%'], ['السبب', '28%']], arr.map(w => tr([{ h: esc(w.name), c: 'nm' }, esc(w.section), { h: esc((w.abs.find(x => x.s === s) || {}).r || '—'), c: 'mut' }]))) : '';
+  const body = H('الحضور حسب القسم') + tbl([['القسم'], ['حاضر', '14%', 'n'], ['غياب', '14%', 'n'], ['إذن', '14%', 'n'], ['إجازة', '14%', 'n']], secRows, '', 0)
     + lst('الغياب', A) + lst('الإذن', P) + lst('الإجازات', L) + (A.length + P.length + L.length ? '' : '<div class="rs-ok">كل العمال حاضرين</div>');
   return sheetFrame({ tone: A.length ? 'warn' : 'ok', score: present, unit: 'حاضر من ' + total, pill: A.length ? 'غياب ' + A.length : 'الكل حاضر',
     ranks: [{ v: pct + '%', l: 'نسبة الحضور' }, { v: total, l: 'إجمالي العمال' }], tiles: [[A.length, 'غياب'], [P.length, 'إذن'], [L.length, 'إجازة'], [present, 'حاضر']],
@@ -637,11 +659,19 @@ function absReportCard(iso) {
   const present = total - today.length - permT - leaveT, pct = total ? Math.round(today.length / total * 100) : 0;
   const month = st.filter(x => x.a > 0).sort((x, y) => y.a - x.a || y.p - x.p || by(x, y));
   const sumDays = st.reduce((p, x) => p + x.a, 0);
-  const hot = n => ({ h: n, c: n >= 3 ? 'n hot' : 'n' });
-  const todayRows = today.map(x => tr([esc(x.w.name), esc(x.w.section), { h: esc((x.w.abs.find(y => y.s === s) || {}).r || '—'), c: 'mut' }, hot(x.a)]));
-  const monthRows = month.map((x, i) => tr([{ h: i + 1, c: 'n' }, esc(x.w.name) + (x.w.absFlags.length ? `<span class="rs-flag">${x.w.absFlags[0]}</span>` : ''), esc(x.w.section), hot(x.a), { h: x.p, c: 'n' }, { h: x.l, c: 'n' }]));
+  const hot = n => ({ h: n, c: n >= 3 ? 'n hot' : 'n' }), short = f => f.replace('غياب ', '').replace(' واحد', '');
+  const todayRows = today.map(x => tr([{ h: esc(x.w.name), c: 'nm' }, esc(x.w.section), { h: esc((x.w.abs.find(y => y.s === s) || {}).r || '—'), c: 'mut' }, hot(x.a)]));
+  let monthHtml;
+  if (month.length > 12) {
+    const half = Math.ceil(month.length / 2), cols = [['#', '14%', 'n'], ['العامل'], ['غياب', '22%', 'n']];
+    const mrow = (x, i) => tr([{ h: i + 1, c: 'n' }, { h: esc(x.w.name), c: x.w.absFlags.length ? 'nm flagged' : 'nm' }, hot(x.a)]);
+    monthHtml = `<div class="rs-two">${tbl(cols, month.slice(0, half).map((x, i) => mrow(x, i)))}${tbl(cols, month.slice(half).map((x, i) => mrow(x, i + half)))}</div>${month.some(x => x.w.absFlags.length) ? '<div class="rs-hint">الأسماء بالأحمر: غياب متكرر (3 أيام متتالية أو 3 غيابات في أسبوع)</div>' : ''}`;
+  } else {
+    monthHtml = tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '26%'], ['غياب', '11%', 'n'], ['إذن', '10%', 'n'], ['إجازة', '12%', 'n']],
+      month.map((x, i) => tr([{ h: i + 1, c: 'n' }, { h: esc(x.w.name) + (x.w.absFlags.length ? `<span class="rs-flag">${short(x.w.absFlags[0])}</span>` : ''), c: 'nm' }, esc(x.w.section), hot(x.a), { h: x.p, c: 'n' }, { h: x.l, c: 'n' }])), 'لا يوجد غياب مسجل');
+  }
   const body = H(`الغياب ${isToday ? 'اليوم' : 'في اليوم ده'} (${today.length})`) + tbl([['العامل'], ['القسم', '27%'], ['السبب', '16%'], ['الإجمالي', '17%', 'n']], todayRows, 'لا يوجد غياب')
-    + H('ترتيب الغياب خلال الشهر، من الأكثر للأقل') + tbl([['#', '10%', 'n'], ['العامل'], ['القسم', '26%'], ['غياب', '11%', 'n'], ['إذن', '10%', 'n'], ['إجازة', '12%', 'n']], monthRows, 'لا يوجد غياب مسجل');
+    + H('ترتيب الغياب خلال الشهر، من الأكثر للأقل') + monthHtml;
   return sheetFrame({ tone: pct >= 15 ? 'bad' : today.length ? 'warn' : 'ok', score: today.length, unit: 'غايب من ' + total, pill: today.length ? `نسبة الغياب <bdi dir="ltr">${pct}%</bdi>` : 'مفيش غياب',
     ranks: [{ v: sumDays, l: 'إجمالي أيام الغياب' }, { v: month.length, s: total + ' /', l: 'عمال لهم غياب' }],
     tiles: [[today.length, 'غياب'], [permT, 'إذن'], [leaveT, 'إجازة'], [present, 'حاضر']],
@@ -653,7 +683,7 @@ function vioReportCard(iso) {
   const people = new Set(list.map(x => x.w.id)).size, monthTotal = D.workers.reduce((p, w) => p + w.cntVio, 0), monthPeople = D.workers.filter(w => w.cntVio).length;
   const types = {}; list.forEach(x => { types[x.v.type] = (types[x.v.type] || 0) + 1; });
   const noAct = list.filter(x => !x.v.action).length;
-  const body = H('مخالفات اليوم') + tbl([['العامل', '24%'], ['القسم', '20%'], ['المخالفة'], ['الإجراء', '20%']], list.map(x => tr([esc(x.w.name), esc(x.w.section), esc(x.v.type) + (x.v.detail ? ': ' + esc(x.v.detail) : ''), { h: esc(x.v.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة في اليوم ده')
+  const body = H('مخالفات اليوم') + tbl([['العامل', '24%'], ['القسم', '20%'], ['المخالفة'], ['الإجراء', '20%']], list.map(x => tr([{ h: esc(x.w.name), c: 'nm' }, esc(x.w.section), esc(x.v.type) + (x.v.detail ? ': ' + esc(x.v.detail) : ''), { h: esc(x.v.action || '—'), c: 'mut' }])), 'لا توجد مخالفات مسجلة في اليوم ده')
     + (list.length ? H('حسب النوع') + tbl([['نوع المخالفة'], ['العدد', '18%', 'n']], Object.keys(types).map(k => tr([esc(k), { h: types[k], c: 'n' }]))) : '');
   return sheetFrame({ tone: list.length ? 'bad' : 'ok', score: list.length, unit: 'مخالفة', pill: list.length ? people + ' عامل' : 'مفيش مخالفات',
     ranks: [{ v: monthTotal, l: 'مخالفات الشهر' }, { v: monthPeople, l: 'عمال لهم مخالفات' }], tiles: [[list.length, 'مخالفات اليوم'], [people, 'عمال'], [Object.keys(types).length, 'أنواع'], [noAct, 'بدون إجراء']],

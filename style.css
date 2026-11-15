@@ -370,3 +370,21 @@ body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
   .pp:last-child{break-after:auto;page-break-after:auto;}
   .pp tr{break-inside:avoid;}
 }
+
+/* ===== كل تقرير = ورقة A4 واحدة ===== */
+.sheet.a4{height:1131px;min-height:0;overflow:hidden;}
+.sheet .rs-main>*{flex-shrink:0;}
+.sheet .rs-t td{font-size:15px;}
+.sheet .rs-t td.nm{font-weight:800;color:#2A1B10;}
+.sheet .rs-t td.flagged{color:#C22A4A;}
+.sheet .rs-two{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;align-items:start;}
+.sheet .rs-two .rs-t td,.sheet .rs-two .rs-t th{padding:7px 8px;}
+.sheet .rs-two .rs-t td.nm{font-size:14px;}
+.sheet .rs-hint{font-size:12px;color:#6F5A3E;margin-top:8px;}
+.sheet.c1 .rs-t td{padding:7px 12px;font-size:14.5px;}.sheet.c1 .rs-t th{padding:8px 12px;}
+.sheet.c1 .rs-h{margin:22px 0 11px;font-size:19px;}.sheet.c1 .rs-name{font-size:38px;}.sheet.c1 .rs-cr{row-gap:11px;}.sheet.c1 .rs-ins{margin-top:12px;}.sheet.c1 .rs-sign{padding-top:30px;}
+.sheet.c2 .rs-t td{padding:5px 12px;font-size:14px;}.sheet.c2 .rs-t th{padding:7px 12px;}
+.sheet.c2 .rs-h{margin:15px 0 8px;font-size:18px;}.sheet.c2 .rs-sign{padding-top:20px;}.sheet.c2 .rs-title{margin-top:4px;}.sheet.c2 .rs-tags{margin-top:8px;}
+.sheet.c2 .rs-two .rs-t td{padding:5px 8px;}
+.sheet .rs-sub{font-size:13px;font-weight:800;color:#6B5640;margin:0 0 6px;}
+.sheet .rs-tags span{font-size:13px;}
