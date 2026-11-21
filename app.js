@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '17';
+const VER = '18';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -264,6 +264,81 @@ function reportCard(sec) {
     tags: [st.n + ' عامل', sec ? '' : D.sections.length + ' أقسام', st.dec.ok ? st.dec.ok + ' مؤهل' : '', st.dec.warn ? st.dec.warn + ' متابعة' : '', st.dec.bad ? st.dec.bad + ' تدريب' : '', st.dec.none ? st.dec.none + ' لم يُقيَّم' : ''], body });
 }
 
+/* Approved portrait carousel, v18. Data remains in the existing store. */
+let homeSelected = null;
+let homeCarousel = null;
+function initialsOf(w) { return w.name.trim().split(/\s+/).slice(0, 2).map(x => x[0]).join(' '); }
+function homeShell(st) {
+  return `<div class="hc-summary"><span>${D.workers.length} عامل</span><span>${st.dec.ok} مؤهل ويكمل</span><span>متوسط التقييم <bdi>${fmt(st.avg)}</bdi></span></div>
+  <div class="hc-stage" role="group" aria-label="اختيار العامل بالسحب أو الأسهم" tabindex="0"></div>
+  <div class="hc-hint"><span>‹</span> اسحب الصور أو اضغط لاختيار عامل <span>›</span></div>
+  <div id="hc-details" aria-live="polite" aria-atomic="true"></div>`;
+}
+function homeDetails(w) {
+  const month = preDefaultMonth(RAW), from = isoToSerial(month + '-01');
+  const [yy, mm] = month.split('-').map(Number);
+  const monthEnd = Math.round(Date.UTC(yy, mm, 0) / 864e5) + 25569;
+  const today = isoToSerial(todayISO());
+  const end = today >= from && today <= monthEnd ? today : monthEnd;
+  const days = Array.from({ length: 7 }, (_, i) => end - 6 + i).filter(s => s >= from);
+  const events = days.map(s => ({ s, t: dayStatus(w, s) }));
+  const flags = w.absFlags.length ? w.absFlags.join('، ') : 'لا توجد تنبيهات غياب متكرر';
+  return `<div class="hc-profile"><small>ملف العامل</small><h2>${esc(w.name)}</h2><p>${esc(w.section)}</p><span class="hc-status tone-${w.tone}">${esc(TONE_LABEL[w.tone])}</span></div>
+  <div class="hc-metrics"><div><b>${fmt(w.avg)}<small> / 5</small></b><span>متوسط التقييم</span></div><div><b>${w.cntAbs}</b><span>أيام الغياب</span></div><div><b>${w.cntVio}</b><span>المخالفات</span></div></div>
+  <div class="hc-days-title"><h3>سجل الحضور</h3><small>${esc(shortDate(days[0]))} إلى ${esc(shortDate(end))}</small></div>
+  <div class="hc-days">${events.map(a => `<div class="hc-day ${a.t === 'غياب' ? 'abs' : a.t ? 'leave' : ''}" title="${esc(fmtDate(a.s))}: ${esc(a.t || 'لا توجد واقعة مسجلة')}"><b>${a.t === 'غياب' ? '−' : a.t === 'إذن' ? 'إ' : a.t === 'إجازة' ? 'ج' : '·'}</b><small>${ymd(a.s).d}</small></div>`).join('')}</div>
+  <p class="hc-legend">البرتقالي: غياب · إ: إذن · ج: إجازة · النقطة: لا توجد واقعة مسجلة</p>
+  <div class="hc-note ${w.absFlags.length ? 'alert' : ''}">${esc(flags)}</div>
+  <button class="hc-open" data-w="${w.id}">فتح ملف العامل ${I.back}</button>`;
+}
+function mountHomeCarousel(list) {
+  const stage = document.querySelector('.hc-stage'); if (!stage) return;
+  homeCarousel = null;
+  if (!list.length) { stage.innerHTML = '<p class="hc-no-results">مفيش عمال مطابقين للبحث</p>'; $('#hc-details').innerHTML = ''; $('.hc-hint').classList.add('hide'); return; }
+  $('.hc-hint').classList.remove('hide');
+  let selected = Math.max(0, list.findIndex(w => w.id === homeSelected));
+  let start = null, offset = 0, dragged = false;
+  stage.innerHTML = list.map(w => `<button class="hc-person" aria-label="اختيار ${esc(w.name)}"><span class="hc-initials" ${w.photo ? 'hidden' : ''}>${esc(initialsOf(w))}</span>${w.photo ? `<img class="hc-portrait" src="${esc(w.photo)}" alt="${esc(w.name)}" draggable="false">` : ''}<small>${esc(w.name.split(/\s+/)[0])}</small></button>`).join('');
+  const buttons = [...stage.querySelectorAll('.hc-person')];
+  function layout(dx = 0, immediate = false) {
+    const step = Math.min(96, stage.clientWidth / 4.05);
+    buttons.forEach((b, i) => {
+      let d = i - selected; if (d > list.length / 2) d -= list.length; if (d < -list.length / 2) d += list.length;
+      const distance = Math.abs(d - dx / step), visible = distance < 3;
+      b.style.transition = immediate ? 'none' : '';
+      b.style.transform = `translate3d(${-d * step + dx}px,${Math.min(distance, 3) * 12}px,0) scale(${1.09 - Math.min(distance, 3) * .18}) rotateY(${d * 5}deg)`;
+      b.style.opacity = visible ? Math.max(.12, 1 - distance * .38) : 0;
+      b.style.visibility = visible ? 'visible' : 'hidden'; b.style.zIndex = 10 - Math.min(9, Math.abs(d));
+      b.style.pointerEvents = visible ? '' : 'none'; b.classList.toggle('selected', i === selected);
+      b.setAttribute('aria-pressed', String(i === selected)); b.tabIndex = i === selected ? 0 : -1;
+    });
+  }
+  function choose(index, immediate = false) {
+    selected = (index + list.length) % list.length; homeSelected = list[selected].id;
+    layout(0, immediate); $('#hc-details').innerHTML = homeDetails(list[selected]);
+    if (!immediate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.querySelectorAll('.hc-profile,.hc-metrics,.hc-days,.hc-note').forEach((node, i) => node.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 500 + i * 35, easing: 'cubic-bezier(.22,.7,.2,1)' }));
+    }
+  }
+  buttons.forEach((b, i) => {
+    b.addEventListener('click', () => { if (!dragged) choose(i); });
+    const img = b.querySelector('img'); if (img) img.addEventListener('error', () => { img.hidden = true; b.querySelector('.hc-initials').hidden = false; });
+  });
+  stage.onpointerdown = e => { if (e.button !== 0) return; start = e.clientX; offset = 0; dragged = false; stage.classList.add('dragging'); };
+  stage.onpointermove = e => { if (start == null) return; offset = e.clientX - start; if (Math.abs(offset) > 5) { dragged = true; stage.setPointerCapture(e.pointerId); layout(offset * .78, true); } };
+  const release = () => {
+    if (start == null) return; start = null; stage.classList.remove('dragging');
+    if (!dragged) return;
+    const next = selected + (Math.abs(offset) > 28 ? (offset > 0 ? 1 : -1) : 0);
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (stage.isConnected) choose(next); }));
+    setTimeout(() => { dragged = false; }, 80);
+  };
+  stage.onpointerup = release; stage.onpointercancel = release;
+  stage.onkeydown = e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); choose(selected + (e.key === 'ArrowLeft' ? 1 : -1)); } };
+  choose(selected, true); homeCarousel = { stage, layout };
+}
+window.addEventListener('resize', () => { if (homeCarousel && homeCarousel.stage.isConnected) homeCarousel.layout(0, true); });
+
 /* ---------------- الشاشات الرئيسية ---------------- */
 const emptyState = () => `<div class="card empty"><div class="big">${I.users}</div><h2>لسه مفيش عمال</h2><p>ابدأ بإضافة أول عامل، أو ارفع ملف الإكسل أو نسخة احتياطية سبق حفظتها.</p><div class="row2" style="justify-content:center"><button class="btn" data-act="add">إضافة عامل</button><button class="btn ghost2" data-act="import">رفع ملف Excel</button></div></div>`;
 
@@ -272,8 +347,7 @@ function renderList() {
   if (!D) { el.innerHTML = emptyState(); return; }
   const st = stats(D.workers);
   const q = state.q.trim();
-  el.innerHTML = `${backupBanner()}
-    <div class="bento"><div class="bb avg"><i class="tape"></i><span>متوسط التقييم</span><b>${fmt(st.avg)}</b></div><div class="bb"><b>${D.workers.length}</b><span>عامل</span></div><div class="bb sun"><b>${st.dec.ok}</b><span>مؤهل ويكمل</span></div></div>${flagsCard()}
+  el.innerHTML = `${homeShell(st)}${backupBanner()}${flagsCard()}
     <div class="stick"><label class="search">${I.search}<input id="q" placeholder="ابحث باسم العامل" aria-label="ابحث باسم العامل" value="${esc(state.q)}" autocomplete="off"></label>
     <div class="chips"><button class="fchip ${state.sec ? '' : 'on'}" data-sec="">الكل</button>${D.sections.map(s => `<button class="fchip ${state.sec === s ? 'on' : ''}" data-sec="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>
     <div class="fsel"><label>ترتيب<select id="sortSel" aria-label="ترتيب القائمة">${[['orig', 'الترتيب الأصلي'], ['name', 'الاسم'], ['rank', 'التقييم، الأعلى أولًا'], ['abs', 'الغياب، الأكثر أولًا'], ['vio', 'المخالفات، الأكثر أولًا']].map(x => `<option value="${x[0]}" ${state.sort === x[0] ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></label>
@@ -294,6 +368,7 @@ const backupDue = () => RAW && !RAW.builtin && (!RAW.lastBackup || (Date.now() -
 const backupBanner = () => backupDue() ? `<div class="banner"><span>مفيش نسخة احتياطية من أكتر من أسبوع. احفظ نسخة عشان بياناتك ما تضيعش.</span><button class="btn sm" data-act="backup">حفظ نسخة</button></div>` : '';
 const flagsCard = () => { const f = D.workers.filter(w => w.absFlags.length); return f.length ? `<div class="card info flags"><h3>تنبيهات الغياب (${f.length})</h3><div class="dchips">${f.map(w => `<button class="dchip tone-bad" data-w="${w.id}">${esc(w.name)}: ${esc(w.absFlags[0])}</button>`).join('')}</div></div>` : ''; };
 function fillWL(list) {
+  mountHomeCarousel(list);
   $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${I.user}</div>`}<div class="wmain"><b>${esc(w.name)}${w.absFlags.length ? ' <span class="flag">غياب متكرر</span>' : ''}</b><small>${esc(w.section)}${(state.sec ? w.srank : w.rank) ? '، الترتيب ' + (state.sec ? w.srank : w.rank) : ''}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
 }
 function renderReports() {
@@ -403,6 +478,7 @@ function reportErr(e) { console.error(e); const b = document.getElementById('fix
 function renderAll() { [renderList, renderAtt, renderVio, renderReports, renderPre, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
   state.tab = t;
+  document.body.classList.toggle('home-redesign', t === 'list');
   ['list','att','vio','rep','pre','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t || (t === 'pre' && b.dataset.tab === 'rep')));
   $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rep:'التقارير', pre:'ما قبل التقييم', data:'البيانات' }[t];
@@ -592,7 +668,7 @@ function vioList() {
 }
 function shrink(file, size = 260) {
   return new Promise((res, rej) => { const img = new Image(), u = URL.createObjectURL(file);
-    img.onload = () => { const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size; c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size); URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg', .82)); };
+    img.onload = () => { const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size; c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size); URL.revokeObjectURL(u); res(c.toDataURL(file.type === 'image/png' || file.type === 'image/webp' ? 'image/png' : 'image/jpeg', .88)); };
     img.onerror = rej; img.src = u; });
 }
 $('#editor').addEventListener('change', async e => {
