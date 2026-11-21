@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '16';
+const VER = '17';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -35,7 +35,7 @@ const I = {
 
 let D = null;           // البيانات بعد المعالجة
 let RAW = null;         // البيانات الخام اللي بتتعدّل
-let state = { tab:'list', q:'', sec:'', rsec:'', sort:'orig', dec:'' };
+let state = { tab:'list', q:'', sec:'', sort:'orig', dec:'' };
 
 /* ---------------- قراءة ملف الإكسل ---------------- */
 function parseWorkbook(wb) {
@@ -294,15 +294,7 @@ const backupDue = () => RAW && !RAW.builtin && (!RAW.lastBackup || (Date.now() -
 const backupBanner = () => backupDue() ? `<div class="banner"><span>مفيش نسخة احتياطية من أكتر من أسبوع. احفظ نسخة عشان بياناتك ما تضيعش.</span><button class="btn sm" data-act="backup">حفظ نسخة</button></div>` : '';
 const flagsCard = () => { const f = D.workers.filter(w => w.absFlags.length); return f.length ? `<div class="card info flags"><h3>تنبيهات الغياب (${f.length})</h3><div class="dchips">${f.map(w => `<button class="dchip tone-bad" data-w="${w.id}">${esc(w.name)}: ${esc(w.absFlags[0])}</button>`).join('')}</div></div>` : ''; };
 function fillWL(list) {
-  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${I.user}</div>`}<div class="wmain"><b>${esc(w.name)}${w.absFlags.length ? ' <span class="flag">غياب متكرر</span>' : ''}</b><small>${esc(w.section)}${w.rank ? '، الترتيب ' + w.rank : ''}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
-}
-function renderRank() {
-  const el = $('#v-rank');
-  if (!D) { el.innerHTML = emptyState(); return; }
-  const list = D.workers.filter(w => !state.rsec || w.section === state.rsec).sort(byRank);
-  const rankIn = w => state.rsec ? w.srank : w.rank;
-  el.innerHTML = `<div class="chips"><button class="fchip ${state.rsec ? '' : 'on'}" data-rsec="">كل العمال</button>${D.sections.map(s => `<button class="fchip ${state.rsec === s ? 'on' : ''}" data-rsec="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-  <div class="list">${list.map(w => { const r = rankIn(w); return `<button class="rrow tone-${w.tone}" data-w="${w.id}"><div class="rk ${r && r <= 3 ? 'g' + r : ''}">${r ?? '—'}</div><div class="rbody"><div class="l1"><b>${esc(w.name)}</b><em>${w.avg == null ? '—' : fmt(w.avg)}</em></div><small>${state.rsec ? TONE_LABEL[w.tone] : esc(w.section)}</small><div class="bar"><i style="width:${w.avg == null ? 0 : w.avg / 5 * 100}%"></i></div></div></button>`; }).join('')}</div>`;
+  $('#wl').innerHTML = list.length ? list.map(w => `<button class="wrow tone-${w.tone}" data-w="${w.id}" >${w.photo ? `<div class="av ph"><img src="${w.photo}" alt=""></div>` : `<div class="av">${I.user}</div>`}<div class="wmain"><b>${esc(w.name)}${w.absFlags.length ? ' <span class="flag">غياب متكرر</span>' : ''}</b><small>${esc(w.section)}${(state.sec ? w.srank : w.rank) ? '، الترتيب ' + (state.sec ? w.srank : w.rank) : ''}</small></div><div class="wscore ${w.avg == null ? 'na' : ''}">${w.avg == null ? 'لم يقيَّم' : fmt(w.avg)}</div></button>`).join('') : `<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>`;
 }
 function renderReports() {
   const el = $('#v-rep');
@@ -408,14 +400,14 @@ function renderData() {
 function applyTheme(m) { const light = m === 'light' || (m === 'auto' && matchMedia('(prefers-color-scheme: light)').matches); document.documentElement.dataset.theme = light ? 'light' : 'dark'; const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = light ? '#F6F0E6' : '#1B0C03'; }
 function setTheme(m) { try { localStorage.setItem('twh_theme', m); } catch (e) {} applyTheme(m); renderData(); }
 function reportErr(e) { console.error(e); const b = document.getElementById('fixbtn'); if (b) { b.classList.remove('hide'); b.innerHTML = 'التطبيق مش بيفتح؟ دوس هنا للتحديث<br><small>' + esc(String(e && e.message || e)).slice(0, 90) + '</small>'; } }
-function renderAll() { [renderList, renderAtt, renderVio, renderRank, renderReports, renderPre, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
+function renderAll() { [renderList, renderAtt, renderVio, renderReports, renderPre, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
   state.tab = t;
-  ['list','att','vio','rank','rep','pre','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
+  ['list','att','vio','rep','pre','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t || (t === 'pre' && b.dataset.tab === 'rep')));
-  $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rank:'ترتيب العمال', rep:'التقارير', pre:'ما قبل التقييم', data:'البيانات' }[t];
+  $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rep:'التقارير', pre:'ما قبل التقييم', data:'البيانات' }[t];
   $('#fab').classList.toggle('hide', t !== 'list');
-  try { if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, pre: renderPre, data: renderData })[t](); } catch (e) { reportErr(e); } syncVioBar();
+  try { if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rep: renderReports, pre: renderPre, data: renderData })[t](); } catch (e) { reportErr(e); } syncVioBar();
   const vw = $('#v-' + t); vw.classList.remove('vin'); void vw.offsetWidth; vw.classList.add('vin');
   window.scrollTo(0, 0);
 }
@@ -552,7 +544,7 @@ async function importFile(file) {
       raw = parseWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' })); raw.fileName = file.name;
     }
     raw.importedAt = now(); raw.builtin = false; RAW = raw; logAct('استيراد ملف ' + file.name);
-    state.q = ''; state.sec = ''; state.rsec = '';
+    state.q = ''; state.sec = '';
     commit(`تم التحديث: ${RAW.workers.length} عامل`); setTab('list');
   } catch (e) { console.error(e); toast(e.message || 'مقدرتش أقرا الملف'); }
 }
@@ -897,13 +889,12 @@ async function printPick() {
 
 /* ---------------- الأحداث ---------------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-w],[data-r],[data-sec],[data-rsec],[data-act]');
+  const t = e.target.closest('[data-tab],[data-w],[data-r],[data-sec],[data-act]');
   if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
   if (t.dataset.w != null) { const w = D.workers[+t.dataset.w]; return openPage(w.name, workerCard(w), `تقييم ${w.name} - ${D.month}`, w.id); }
   if (t.dataset.r != null) { const s = t.dataset.r; return openPage(s ? 'تقرير ' + s : 'تقرير التجهيز', reportCard(s || null), `تقرير ${s || 'قسم التجهيز'} - ${D.month}`); }
   if (t.dataset.sec != null && t.closest('#v-list')) { state.sec = t.dataset.sec; return renderList(); }
-  if (t.dataset.rsec != null) { state.rsec = t.dataset.rsec; return renderRank(); }
   if (t.dataset.act === 'import' || t.dataset.act === 'restore') return $('#file').click();
   if (t.dataset.act === 'add') return openEditor(-1);
   if (t.dataset.act === 'check') return checkFiles();
