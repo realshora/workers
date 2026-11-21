@@ -400,7 +400,7 @@ body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
  .pre-print{page:preReport;padding:0;}
 }
 
-/* v18: approved orange / charcoal worker home. Scoped to the home screen. */
+/* v19: approved orange / charcoal worker home. Scoped to the home screen. */
 body.home-redesign{--bg:#111213;--surf:#202224;--field:#282827;--ink:#faf6f0;--muted:#aaa19a;--line:#ffffff16;--gold:#ff985b;--btn:#ff985b;--btn-ink:#321b10;--on-gold:#321b10;background:#111213;color:#faf6f0;padding-bottom:110px;color-scheme:dark}
 body.home-redesign:before{position:absolute;height:460px;opacity:1;background:radial-gradient(ellipse 260px 245px at 50% 20%,#ffae6d 0%,#fb792f 38%,#944321 66%,transparent 100%),linear-gradient(#2c1b16,transparent);mask:none;-webkit-mask:none}
 .home-redesign .top{max-width:640px;margin:auto;padding:calc(25px + env(safe-area-inset-top)) 23px 8px;gap:9px}
@@ -431,7 +431,7 @@ body.home-redesign:before{position:absolute;height:460px;opacity:1;background:ra
 .hc-status{display:inline-block;font-size:11px;color:#f4be9c;border:1px solid #e89e5c36;background:#ffa4640d;border-radius:24px;margin-top:13px;padding:7px 12px}
 .hc-metrics{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px;border-bottom:1px solid #ffffff10;padding:25px 0 19px}
 .hc-metrics>div{text-align:center}.hc-metrics>div:first-child{text-align:start}
-.hc-metrics b{font-size:34px;line-height:1.25;font-weight:500;display:inline-block;direction:ltr;color:#eeeae3}
+.hc-metrics b{font-size:34px;line-height:1.25;font-weight:700;display:inline-block;direction:ltr;color:#eeeae3}
 .hc-metrics>div:first-child b{color:#ffad73}.hc-metrics b small{font-size:12px;color:#9e9690}
 .hc-metrics span{display:block;font-size:11px;color:#a79f98;margin-top:9px}
 .hc-days-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:21px}
