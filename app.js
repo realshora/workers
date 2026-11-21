@@ -2,7 +2,7 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '15';
+const VER = '16';
 const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
@@ -310,10 +310,87 @@ function renderReports() {
   const all = stats(D.workers);
   const card = (title, sub, st, hue, icon, attr) => `<button class="rep tone-${toneOf(st.avg)}" ${attr} ><div class="ic">${icon}</div><div class="tx"><b>${esc(title)}</b><small>${sub}</small></div><div class="av2">${fmt(st.avg)}</div></button>`;
   const absToday = D.workers.filter(w => dayStatus(w, isoToSerial(att.iso)) === 'غياب').length;
-  el.innerHTML = `<div class="list">${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}<button class="rep tone-${absToday ? 'bad' : 'ok'}" data-act="absrep"><div class="ic">${I.cal}</div><div class="tx"><b>تقرير الغياب للإدارة</b><small>غياب اليوم والإجمالي الشهري من الأكثر للأقل</small></div><div class="av2">${absToday}</div></button><button class="rep" data-act="pdf"><div class="ic">${I.doc}</div><div class="tx"><b>طباعة أو PDF للتقارير</b><small>كل العمال أو قسم أو حزمة الإدارة</small></div></button></div>
+  el.innerHTML = `<div class="list"><button class="rep" data-pre="open"><div class="ic">${I.doc}</div><div class="tx"><b>تقرير ما قبل التقييم</b><small>غياب وأذونات وإجازات ومخالفات كل عامل خلال شهر تختاره</small></div></button>${card('تقرير قسم التجهيز كامل', `${all.n} عامل في كل الأقسام`, all, '#4F46E5', I.chart, 'data-r=""')}<button class="rep tone-${absToday ? 'bad' : 'ok'}" data-act="absrep"><div class="ic">${I.cal}</div><div class="tx"><b>تقرير الغياب للإدارة</b><small>غياب اليوم والإجمالي الشهري من الأكثر للأقل</small></div><div class="av2">${absToday}</div></button><button class="rep" data-act="pdf"><div class="ic">${I.doc}</div><div class="tx"><b>طباعة أو PDF للتقارير</b><small>كل العمال أو قسم أو حزمة الإدارة</small></div></button></div>
     <div class="h2">تقارير الأقسام (كل قسم لوحده)</div>
     <div class="list">${D.sections.map((s, i) => { const l = D.workers.filter(w => w.section === s), st = stats(l); return card(s, `${st.n} عمال، ${st.dec.ok} مؤهل، ${st.dec.warn} متابعة`, st, HUES[i % HUES.length], I.doc, `data-r="${esc(s)}"`); }).join('')}</div>`;
 }
+/* ---------------- تقرير ما قبل التقييم ---------------- */
+const pre = { source: 'current', month: '', sec: '' };
+function preDataset() {
+  return pre.source === 'current' ? RAW : ((RAW.archive || [])[Number(pre.source)] || RAW);
+}
+function preDefaultMonth(data) {
+  const label = String(data.month || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const year = label.match(/\b(\d{4})\b/), m = MONTHS.findIndex(n => label.includes(n));
+  if (year && m >= 0) return `${year[1]}-${String(m + 1).padStart(2, '0')}`;
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(label)) return label;
+  const dates = (data.workers || []).flatMap(w => [...(w.abs || []), ...(w.vio || [])]).map(x => x.s).filter(Number.isFinite);
+  if (dates.length) { const p = ymd(Math.max(...dates)); if (p.y >= 1900 && p.y <= 9999) return `${p.y}-${String(p.m).padStart(2, '0')}`; }
+  return todayISO().slice(0, 7);
+}
+function preRows(data, month, section = '') {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return [];
+  const [year, m] = month.split('-').map(Number);
+  const from = isoToSerial(month + '-01'), to = Math.round(Date.UTC(year, m, 1) / 86400000) + 25569;
+  const inside = x => x && Number.isFinite(x.s) && x.s >= from && x.s < to;
+  return (data.workers || []).filter(w => !section || w.section === section).map(w => {
+    const abs = (w.abs || []).filter(inside).slice().sort((a, b) => a.s - b.s);
+    const vio = (w.vio || []).filter(inside).slice().sort((a, b) => a.s - b.s);
+    const days = t => new Set(abs.filter(x => x.t === t).map(x => Math.floor(x.s))).size;
+    return { name: w.name, section: w.section, abs, vio, absent: days('غياب'), permissions: abs.filter(x => x.t === 'إذن').length, leave: days('إجازة'), violations: vio.length };
+  });
+}
+function preMonthLabel() {
+  const [y, m] = pre.month.split('-').map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+}
+const preNote = 'الأرقام من التسجيلات الموجودة فقط. الصفر يعني لا توجد أحداث مسجلة، وليس إثبات حضور. التقرير لا يغيّر درجات التقييم.';
+function preDetails(r) {
+  return `<div class="pre-events"><h4>الغياب والأذونات والإجازات</h4>${r.abs.length ? r.abs.map(a => `<p><b>${esc(a.t)}</b> · ${esc(fmtDate(a.s))}${a.r ? ' · ' + esc(a.r) : ''}</p>`).join('') : '<p>لا توجد أحداث مسجلة خلال الشهر.</p>'}<h4>المخالفات</h4>${r.vio.length ? r.vio.map(v => `<div class="pre-violation"><b>${esc(v.type || 'مخالفة')}</b><small>${esc(fmtDate(v.s))}</small>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}${v.action ? `<p>الإجراء: ${esc(v.action)}</p>` : ''}</div>`).join('') : '<p>لا توجد مخالفات مسجلة خلال الشهر.</p>'}</div>`;
+}
+function renderPre() {
+  const el = $('#v-pre'); if (!D || !RAW) { el.innerHTML = emptyState(); return; }
+  const data = preDataset(); if (!pre.month) pre.month = preDefaultMonth(data);
+  const sections = [...new Set((data.workers || []).map(w => w.section))];
+  if (!sections.includes(pre.sec)) pre.sec = '';
+  const rows = preRows(data, pre.month, pre.sec), totals = rows.reduce((a, r) => a.map((v, i) => v + [r.absent, r.permissions, r.leave, r.violations][i]), [0, 0, 0, 0]);
+  const labels = ['أيام غياب', 'أذونات', 'أيام إجازة', 'مخالفات'];
+  el.innerHTML = `<button class="btn ghost2 sm" data-tab="rep">رجوع للتقارير</button>
+    <div class="pre-heading"><span>متابعة الانضباط والحضور</span><h2>تقرير ما قبل التقييم</h2><p>راجع تسجيلات كل عامل قبل ما تحدد تقييمه.</p></div>
+    <div class="card pre-filters"><label>مصدر البيانات<select id="preSource"><option value="current" ${pre.source === 'current' ? 'selected' : ''}>البيانات الحالية${RAW.month ? ' · ' + esc(RAW.month) : ''}</option>${(RAW.archive || []).map((a, i) => `<option value="${i}" ${pre.source === String(i) ? 'selected' : ''}>أرشيف · ${esc(a.month)} (${i + 1})</option>`).join('')}</select></label><label>الشهر<input type="month" id="preMonth" value="${esc(pre.month)}"></label><label>القسم<select id="preSection"><option value="">كل الأقسام</option>${sections.map(s => `<option ${s === pre.sec ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div>
+    <div class="pre-meta"><b>${esc(preMonthLabel())}</b><span>${rows.length} عامل · ${esc(pre.sec || 'كل الأقسام')}</span></div>
+    <div class="pre-totals">${totals.map((n, i) => `<div><b>${n}</b><span>${labels[i]}</span></div>`).join('')}</div>
+    <div class="hint pre-note">${preNote} أيام الغياب والإجازة تُحسب بدون تكرار اليوم، والأذونات تُحسب بعدد التسجيلات.</div>
+    <div class="row2 pre-tools"><button class="btn sm" data-pre="print">طباعة / PDF</button><button class="btn ghost2 sm" data-pre="excel">تصدير Excel</button></div>
+    <div class="pre-workers">${rows.length ? rows.map(r => `<article class="card pre-worker"><header><div><h3>${esc(r.name)}</h3><small>${esc(r.section)}</small></div><span class="pre-status ${r.abs.length || r.vio.length ? '' : 'clean'}">${r.abs.length || r.vio.length ? 'له تسجيلات' : 'بدون تسجيلات'}</span></header><div class="pre-counts">${[r.absent, r.permissions, r.leave, r.violations].map((n, i) => `<div><b>${n}</b><span>${labels[i]}</span></div>`).join('')}</div><details><summary>التواريخ وتفاصيل المخالفات</summary>${preDetails(r)}</details></article>`).join('') : '<div class="card info"><p>لا يوجد عمال في مصدر البيانات أو القسم المختار.</p></div>'}</div>`;
+}
+function exportPre() {
+  const rows = preRows(preDataset(), pre.month, pre.sec), wb = XLSX.utils.book_new();
+  const summary = [['تقرير ما قبل التقييم', preMonthLabel()], ['المصدر', pre.source === 'current' ? 'البيانات الحالية' : 'الأرشيف: ' + preDataset().month], ['ملاحظة', preNote], [], ['العامل', 'القسم', 'أيام الغياب', 'عدد الأذونات', 'أيام الإجازة', 'عدد المخالفات'], ...rows.map(r => [r.name, r.section, r.absent, r.permissions, r.leave, r.violations])];
+  const attendance = [['العامل', 'القسم', 'التاريخ', 'النوع', 'السبب']], violations = [['العامل', 'القسم', 'التاريخ', 'المخالفة', 'التفاصيل', 'الإجراء']];
+  const date = s => { const p = ymd(s); return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`; };
+  rows.forEach(r => { r.abs.forEach(a => attendance.push([r.name, r.section, date(a.s), a.t, a.r || ''])); r.vio.forEach(v => violations.push([r.name, r.section, date(v.s), v.type || '', v.detail || '', v.action || ''])); });
+  [['ما قبل التقييم', summary], ['الغياب والأذونات', attendance], ['المخالفات', violations]].forEach(([name, cells]) => { const ws = XLSX.utils.aoa_to_sheet(cells); ws['!cols'] = [{wch:28},{wch:22},{wch:18},{wch:24},{wch:40},{wch:32}]; XLSX.utils.book_append_sheet(wb, ws, name); });
+  download(new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `تقرير ما قبل التقييم ${pre.month}.xlsx`);
+}
+function printPre() {
+  const rows = preRows(preDataset(), pre.month, pre.sec);
+  let root = document.getElementById('printRoot'); if (!root) { root = document.createElement('div'); root.id = 'printRoot'; document.body.appendChild(root); }
+  root.innerHTML = `<div class="pre-print" dir="rtl"><h1>تقرير ما قبل التقييم</h1><p>${esc(preMonthLabel())} · ${esc(pre.sec || 'كل الأقسام')} · ${rows.length} عامل</p><p>المصدر: ${esc(pre.source === 'current' ? 'البيانات الحالية' : 'الأرشيف: ' + preDataset().month)}</p><p>${preNote}</p><table><thead><tr>${['العامل','القسم','أيام الغياب','الأذونات','أيام الإجازة','المخالفات'].map(s => `<th>${s}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${[r.name,r.section,r.absent,r.permissions,r.leave,r.violations].map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table><h2>التواريخ وتفاصيل المخالفات</h2>${rows.filter(r => r.abs.length || r.vio.length).map(r => `<section><h3>${esc(r.name)} · ${esc(r.section)}</h3>${preDetails(r)}</section>`).join('') || '<p>لا توجد أحداث مسجلة خلال الشهر.</p>'}</div>`;
+  document.body.classList.add('printing'); document.fonts.ready.then(() => window.print());
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'preSource') { pre.source = e.target.value; pre.sec = ''; pre.month = preDefaultMonth(preDataset()); renderPre(); }
+  if (e.target.id === 'preMonth') { if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) { e.target.value = pre.month; return toast('اختار الشهر والسنة'); } pre.month = e.target.value; renderPre(); }
+  if (e.target.id === 'preSection') { pre.sec = e.target.value; renderPre(); }
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-pre]'); if (!t || !D) return;
+  if (t.dataset.pre === 'open') { pre.month = ''; pre.sec = ''; pre.source = 'current'; setTab('pre'); }
+  if (t.dataset.pre === 'print') printPre();
+  if (t.dataset.pre === 'excel') exportPre();
+});
+
 function renderData() {
   const el = $('#v-data');
   if (!D) { el.innerHTML = emptyState(); return; }
@@ -331,14 +408,14 @@ function renderData() {
 function applyTheme(m) { const light = m === 'light' || (m === 'auto' && matchMedia('(prefers-color-scheme: light)').matches); document.documentElement.dataset.theme = light ? 'light' : 'dark'; const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = light ? '#F6F0E6' : '#1B0C03'; }
 function setTheme(m) { try { localStorage.setItem('twh_theme', m); } catch (e) {} applyTheme(m); renderData(); }
 function reportErr(e) { console.error(e); const b = document.getElementById('fixbtn'); if (b) { b.classList.remove('hide'); b.innerHTML = 'التطبيق مش بيفتح؟ دوس هنا للتحديث<br><small>' + esc(String(e && e.message || e)).slice(0, 90) + '</small>'; } }
-function renderAll() { [renderList, renderAtt, renderVio, renderRank, renderReports, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
+function renderAll() { [renderList, renderAtt, renderVio, renderRank, renderReports, renderPre, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
 function setTab(t) {
   state.tab = t;
-  ['list','att','vio','rank','rep','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
-  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rank:'ترتيب العمال', rep:'التقارير', data:'البيانات' }[t];
+  ['list','att','vio','rank','rep','pre','data'].forEach(k => $('#v-' + k).classList.toggle('hide', k !== t));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t || (t === 'pre' && b.dataset.tab === 'rep')));
+  $('#title').textContent = { list:'عمال التجهيز', att:'الحضور والغياب', vio:'المخالفات', rank:'ترتيب العمال', rep:'التقارير', pre:'ما قبل التقييم', data:'البيانات' }[t];
   $('#fab').classList.toggle('hide', t !== 'list');
-  try { if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, data: renderData })[t](); } catch (e) { reportErr(e); } syncVioBar();
+  try { if (D) ({ att: renderAtt, vio: renderVio, list: renderList, rank: renderRank, rep: renderReports, pre: renderPre, data: renderData })[t](); } catch (e) { reportErr(e); } syncVioBar();
   const vw = $('#v-' + t); vw.classList.remove('vin'); void vw.offsetWidth; vw.classList.add('vin');
   window.scrollTo(0, 0);
 }
@@ -851,6 +928,6 @@ try { applyTheme(localStorage.getItem('twh_theme') || 'dark'); } catch (e) {}
 load(); renderAll(); setTab('list');
 window.__booted = true;
 try { showLock(); } catch (e) {}
-window.__app = { get D() { return D; }, printSheets, workerCard, reportCard, absReportCard, withMonth, get RAW() { return RAW; }, parseWorkbook, enrich };
+window.__app = { get D() { return D; }, preRows, preDefaultMonth, printSheets, workerCard, reportCard, absReportCard, withMonth, get RAW() { return RAW; }, parseWorkbook, enrich };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
