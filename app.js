@@ -485,6 +485,7 @@ const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${Stri
 const isoToSerial = iso => { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000) + 25569; };
 let ed = null;
 function openEditor(i, mode) {
+  if (!RAW) RAW = sanitize({ workers: [] });
   const base = i >= 0 ? RAW.workers[i] : { name: '', section: '', scores: Array(8).fill(null), status: '', abs: [], vio: [] };
   ed = { i, mode: mode || '', w: JSON.parse(JSON.stringify(base)) };
   const w = ed.w, hd = ed.mode === 'reeval' ? ' hide' : '', uniq = f => [...new Set(RAW.workers.flatMap(x => f(x)).filter(Boolean))];
