@@ -2,8 +2,8 @@
 'use strict';
 const DUMMY = document.createElement('div');
 const $ = s => document.querySelector(s) || DUMMY;
-const VER = '19';
-const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
+const VER = '20';
+const APP_FILES = ['index.html','style.css','app.js','data.js','manifest.json','sw.js','art.svg','art-navy.svg','logo-emblem.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','xlsx.mini.min.js','html-to-image.js','tajawal-arabic-500-normal.woff2','tajawal-arabic-700-normal.woff2','tajawal-arabic-800-normal.woff2','tajawal-latin-500-normal.woff2','tajawal-latin-700-normal.woff2','tajawal-latin-800-normal.woff2'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS = 'twh_workers_v1';
 const CRIT = ['جودة الشغل','الإنتاجية','المعرفة الفنية','الالتزام والانضباط','السلامة والنظافة','الحفاظ على الخامات والمعدات','التعاون والسلوك','المبادرة والتطور'];
@@ -472,7 +472,7 @@ function renderData() {
     <div class="card info"><h3>تحديث التطبيق</h3><p>الإصدار ${VER}. لو التطبيق مش بيتحدث أو في حاجة مش شغالة، دوس الزرار وهيحمّل آخر نسخة. بياناتك مش بتتمسح.</p><div class="row2"><button class="btn ghost2" data-act="refreshapp">تحديث التطبيق لآخر نسخة</button><button class="btn ghost2" data-act="check">فحص ملفات التطبيق</button></div></div>
     <div class="card info"><h3>استيراد من Excel</h3><p>اختياري. الملف بيحل محل البيانات الحالية.</p><div class="row2"><button class="btn ghost2" data-act="import">اختيار ملف Excel</button>${D.builtin ? '' : '<button class="btn danger" data-act="clear">الرجوع للبيانات الأصلية</button>'}</div></div>`;
 }
-function applyTheme(m) { const light = m === 'light' || (m === 'auto' && matchMedia('(prefers-color-scheme: light)').matches); document.documentElement.dataset.theme = light ? 'light' : 'dark'; const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = document.body.classList.contains('home-redesign') ? '#FB792F' : light ? '#F6F0E6' : '#1B0C03'; }
+function applyTheme(m) { const light = m === 'light' || (m === 'auto' && matchMedia('(prefers-color-scheme: light)').matches); document.documentElement.dataset.theme = light ? 'light' : 'dark'; const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.content = document.body.classList.contains('home-redesign') ? (light ? '#D6A779' : '#3D5F88') : light ? '#F3E9D7' : '#0C1220'; }
 function setTheme(m) { try { localStorage.setItem('twh_theme', m); } catch (e) {} applyTheme(m); renderData(); }
 function reportErr(e) { console.error(e); const b = document.getElementById('fixbtn'); if (b) { b.classList.remove('hide'); b.innerHTML = 'التطبيق مش بيفتح؟ دوس هنا للتحديث<br><small>' + esc(String(e && e.message || e)).slice(0, 90) + '</small>'; } }
 function renderAll() { [renderList, renderAtt, renderVio, renderReports, renderPre, renderData].forEach(f => { try { f(); } catch (e) { reportErr(e); } }); $('#month').textContent = D ? D.month : ''; }
@@ -522,7 +522,7 @@ async function renderPng(node) {
   if (typeof htmlToImage === 'undefined') throw new Error('ملف html-to-image.js مش مرفوع على GitHub. دوس فحص ملفات التطبيق في تبويب البيانات.');
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
   const sheet = node.querySelector('.sheet'), target = sheet || node;
-  const opt = sheet ? { style: { transform: 'none' }, backgroundColor: '#FCF7F0' } : { backgroundColor: '#1B0C03' };
+  const opt = sheet ? { style: { transform: 'none' }, backgroundColor: '#FCF7F0' } : { backgroundColor: '#0C1220' };
   const w = target.offsetWidth, h = target.offsetHeight;
   const r = Math.min(3, 4096 / w, 5200 / h, Math.sqrt(7e6 / (w * h)));
   let lastErr;
@@ -669,7 +669,7 @@ function vioList() {
 }
 function shrink(file, size = 260) {
   return new Promise((res, rej) => { const img = new Image(), u = URL.createObjectURL(file);
-    img.onload = () => { const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size; c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size); URL.revokeObjectURL(u); res(c.toDataURL(file.type === 'image/png' || file.type === 'image/webp' ? 'image/png' : 'image/jpeg', .88)); };
+    img.onload = () => { const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size; c.getContext('2d').drawImage(img, (img.width - s) / 2, 0, s, s, 0, 0, size, size); URL.revokeObjectURL(u); res(c.toDataURL(file.type === 'image/png' || file.type === 'image/webp' ? 'image/png' : 'image/jpeg', .88)); };
     img.onerror = rej; img.src = u; });
 }
 $('#editor').addEventListener('change', async e => {
