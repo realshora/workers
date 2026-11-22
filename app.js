@@ -287,7 +287,7 @@ function homeDetails(w) {
   <div class="hc-metrics"><div><b>${fmt(w.avg)}<small> / 5</small></b><span>متوسط التقييم</span></div><div><b>${w.cntAbs}</b><span>أيام الغياب</span></div><div><b>${w.cntVio}</b><span>المخالفات</span></div></div>
   <div class="hc-days-title"><h3>سجل الحضور</h3><small>${esc(shortDate(days[0]))} إلى ${esc(shortDate(end))}</small></div>
   <div class="hc-days">${events.map(a => `<div class="hc-day ${a.t === 'غياب' ? 'abs' : a.t ? 'leave' : ''}" title="${esc(fmtDate(a.s))}: ${esc(a.t || 'لا توجد واقعة مسجلة')}"><b>${a.t === 'غياب' ? '−' : a.t === 'إذن' ? 'إ' : a.t === 'إجازة' ? 'ج' : '·'}</b><small>${ymd(a.s).d}</small></div>`).join('')}</div>
-  <p class="hc-legend">البرتقالي: غياب · إ: إذن · ج: إجازة · النقطة: لا توجد واقعة مسجلة</p>
+  <p class="hc-legend">اليوم الملوّن: غياب · إ: إذن · ج: إجازة · النقطة: لا توجد واقعة مسجلة</p>
   <div class="hc-note ${w.absFlags.length ? 'alert' : ''}">${esc(flags)}</div>
   <button class="hc-open" data-w="${w.id}">فتح ملف العامل ${I.back}</button>`;
 }
