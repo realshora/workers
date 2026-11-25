@@ -788,11 +788,11 @@ function registerVio() {
 function attReportCard(iso) {
   const s = isoToSerial(iso), total = D.workers.length, by = t => D.workers.filter(w => dayStatus(w, s) === t);
   const A = by('غياب'), P = by('إذن'), L = by('إجازة'), present = total - A.length - P.length - L.length, pct = total ? Math.round(present / total * 100) : 0;
-  const secRows = D.sections.map(sec => { const l = D.workers.filter(w => w.section === sec), c = t => l.filter(w => dayStatus(w, s) === t).length, a1 = c('غياب'), p1 = c('إذن'), l1 = c('إجازة');
-    return tr([esc(sec), { h: l.length - a1 - p1 - l1, c: 'n' }, { h: a1, c: 'n' }, { h: p1, c: 'n' }, { h: l1, c: 'n' }]); });
-  const lst = (title, arr) => arr.length ? H(`${title} (${arr.length})`) + tbl([['العامل'], ['القسم', '30%'], ['السبب', '28%']], arr.map(w => tr([{ h: esc(w.name), c: 'nm' }, esc(w.section), { h: esc((w.abs.find(x => x.s === s) || {}).r || '—'), c: 'mut' }]))) : '';
-  const body = H('الحضور حسب القسم') + tbl([['القسم'], ['حاضر', '14%', 'n'], ['غياب', '14%', 'n'], ['إذن', '14%', 'n'], ['إجازة', '14%', 'n']], secRows, '', 0)
-    + lst('الغياب', A) + lst('الإذن', P) + lst('الإجازات', L) + (A.length + P.length + L.length ? '' : '<div class="rs-ok">كل العمال حاضرين</div>');
+  const lrow = w => tr([{ h: esc(w.name), c: 'nm' }, esc(w.section), { h: esc((w.abs.find(x => x.s === s) || {}).r || '—'), c: 'mut' }]);
+  const lcols = [['العامل'], ['القسم', '32%'], ['السبب', '26%']];
+  const lst = (title, arr, two) => { if (!arr.length) return ''; if (!two || arr.length < 2) return H(`${title} (${arr.length})`) + tbl(lcols, arr.map(lrow), '', two ? 0 : undefined);
+    const half = Math.ceil(arr.length / 2); return H(`${title} (${arr.length})`) + `<div class="rs-two">${tbl(lcols, arr.slice(0, half).map(lrow), '', 0).replace('class="rs-t"', 'class="rs-t att"')}${tbl(lcols, arr.slice(half).map(lrow), '', 0).replace('class="rs-t"', 'class="rs-t att"')}</div>`; };
+  const body = lst('الغياب', A, true) + lst('الإذن', P, true) + lst('الإجازات', L, true) + (A.length + P.length + L.length ? '' : '<div class="rs-ok">كل العمال حاضرين</div>');
   return sheetFrame({ tone: A.length ? 'warn' : 'ok', score: present, unit: 'حاضر من ' + total, pill: A.length ? 'غياب ' + A.length : 'الكل حاضر',
     ranks: [{ v: pct + '%', l: 'نسبة الحضور' }, { v: total, l: 'إجمالي العمال' }], tiles: [[A.length, 'غياب'], [P.length, 'إذن'], [L.length, 'إجازة'], [present, 'حاضر']],
     title: 'تقرير الحضور اليومي', name: fmtDate(s), tags: [total + ' عامل'], body });
