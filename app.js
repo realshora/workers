@@ -662,7 +662,7 @@ function paintEd() {
   document.querySelectorAll('.nums button').forEach(b => b.classList.toggle('on', ed.w.scores[+b.dataset.k] === +b.dataset.v));
 }
 function absList() {
-  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}${a.r ? ' (' + esc(a.r) + ')' : ''}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
+  $('#absList').innerHTML = ed.w.abs.slice().sort((a, b) => a.s - b.s).map(a => `<div class="chiprow"><span class="dchip tone-${a.t === 'غياب' ? 'bad' : a.t === 'إذن' ? 'warn' : 'none'}">${a.t}: ${fmtDate(a.s)}${a.x || a.r ? ' (' + [a.x ? fmtExit(a.x) : '', a.r ? esc(a.r) : ''].filter(Boolean).join('، ') + ')' : ''}</span><button data-e="rmabs" data-n="${a.s}">×</button></div>`).join('');
 }
 function vioList() {
   $('#vioList').innerHTML = ed.w.vio.map((v, n) => `<div class="ve"><div><b>${esc(v.type)}</b><br><small>${fmtDate(v.s)}${v.action ? '، ' + esc(v.action) : ''}</small>${v.detail ? `<p>${esc(v.detail)}</p>` : ''}</div><button data-e="rmvio" data-n="${n}">×</button></div>`).join('');
@@ -683,7 +683,8 @@ $('#editor').addEventListener('click', e => {
   if (k === 'rmphoto') { delete ed.w.photo; $('#phBox').textContent = 'بدون صورة'; return; }
   if (k === 'status') { ed.w.status = ed.w.status === v ? '' : v; return paintEd(); }
   if (k === 'score') { const kk = +t.dataset.k; ed.w.scores[kk] = ed.w.scores[kk] === +v ? null : +v; return paintEd(); }
-  if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push({ s, t: v, r: $('#aReason').value.trim() }); $('#aReason').value = ''; absList(); return toast(`اتسجل ${v}`); }
+  if (k === 'abs') { const d = $('#aDate').value; if (!d) return toast('اختار التاريخ الأول'); const s = isoToSerial(d); const add = o => { ed.w.abs = ed.w.abs.filter(x => x.s !== s); ed.w.abs.push(Object.assign({ s, t: v, r: $('#aReason').value.trim() }, o || {})); $('#aReason').value = ''; absList(); toast(`اتسجل ${v}`); };
+    if (v === 'إذن') { askPerm(ed.w.name, { r: $('#aReason').value.trim() }).then(a => { if (a) add(a); }); return; } add(); return; }
   if (k === 'rmabs') { ed.w.abs = ed.w.abs.filter(x => x.s !== +t.dataset.n); return absList(); }
   if (k === 'addvio') { const type = $('#vType').value.trim(), d = $('#vDate').value; if (!type || !d) return toast('اكتب نوع المخالفة والتاريخ'); ed.w.vio.push({ s: isoToSerial(d), type, detail: $('#vDet').value.trim(), action: $('#vAct').value.trim() }); ['vType','vDet','vAct'].forEach(id => $('#' + id).value = ''); vioList(); return toast('اتسجلت المخالفة'); }
   if (k === 'rmvio') { ed.w.vio.splice(+t.dataset.n, 1); return vioList(); }
@@ -739,9 +740,27 @@ function fillAtt() {
   $('#attRows').innerHTML = list.map(w => { const t = dayStatus(w, s), tone = t ? tn[t] : 'ok';
     return `<button class="arow tone-${tone} ${t ? 'is' : 'pres'}" data-aw="${w.id}"><div class="chk">${t ? I.check : ''}</div><div class="wmain"><b>${esc(w.name)}</b><small>${esc(w.section)}</small></div>${t ? `<div class="stp">${t}</div>` : ''}</button>`; }).join('') || '<div class="card empty" style="padding:26px"><p style="margin:0">مفيش نتايج</p></div>';
 }
-function tapAtt(id) {
+const fmtExit = x => { const m = /^(\d{1,2}):(\d{2})$/.exec(x || ''); if (!m) return x || '—'; let h = +m[1]; const ap = h >= 12 ? 'م' : 'ص'; h = h % 12 || 12; return h + ':' + m[2] + ' ' + ap; };
+function askPerm(name, old) {
+  return new Promise(res => {
+    const d = document.createElement('div'); d.className = 'dlg';
+    d.innerHTML = `<div class="box" role="dialog" aria-modal="true"><h3>إذن ${esc(name)}</h3><p>اكتب وقت الخروج والسبب، الاتنين لازم يتكتبوا.</p><label style="display:block;text-align:right;margin:8px 0 4px;font-size:13px">وقت الخروج</label><input class="fin" id="pgT" type="time" value="${esc((old && old.x) || '')}" aria-label="وقت الخروج"><label style="display:block;text-align:right;margin:10px 0 4px;font-size:13px">السبب</label><input class="fin" id="pgR" type="text" placeholder="مثال: ظرف عائلي" value="${esc((old && old.r) || '')}" aria-label="السبب" autocomplete="off"><div id="pgE" style="color:#e5484d;font-size:13px;min-height:18px;margin-top:6px"></div><div class="row2"><button class="btn" data-d="ok">تسجيل الإذن</button><button class="btn ghost2" data-d="no">إلغاء</button></div></div>`;
+    document.body.appendChild(d);
+    const done = v => { d.remove(); res(v); };
+    d.addEventListener('click', e => { const k = e.target.dataset && e.target.dataset.d;
+      if (k === 'ok') { const x = d.querySelector('#pgT').value, r = d.querySelector('#pgR').value.trim();
+        if (!x) { d.querySelector('#pgE').textContent = 'اكتب وقت الخروج'; return; }
+        if (!r) { d.querySelector('#pgE').textContent = 'اكتب السبب'; return; }
+        done({ x, r }); }
+      else if (k === 'no' || e.target === d) done(null); });
+    setTimeout(() => d.querySelector('#pgT').focus(), 60);
+  });
+}
+async function tapAtt(id) {
   const w = RAW.workers[id], s = isoToSerial(att.iso), old = w.abs.find(x => x.s === s), prev = JSON.stringify(w.abs);
-  w.abs = w.abs.filter(x => x.s !== s); if (!(old && old.t === att.type)) w.abs.push({ s, t: att.type });
+  let extra = {};
+  if (att.type === 'إذن' && !(old && old.t === 'إذن')) { const a = await askPerm(w.name, null); if (!a) return; extra = a; }
+  w.abs = w.abs.filter(x => x.s !== s); if (!(old && old.t === att.type)) w.abs.push(Object.assign({ s, t: att.type }, extra));
   const y = window.scrollY, removed = old && old.t === att.type; logAct(`${w.name}: ${removed ? 'إلغاء ' : ''}${att.type} ${att.iso}`); commit(); window.scrollTo(0, y);
   toast(removed ? 'اتشال تسجيل ' + w.name : w.name + ': ' + att.type, { label: 'تراجع', fn: () => { RAW.workers[id].abs = JSON.parse(prev); const y2 = window.scrollY; commit(); window.scrollTo(0, y2); } });
 }
@@ -788,10 +807,13 @@ function registerVio() {
 function attReportCard(iso) {
   const s = isoToSerial(iso), total = D.workers.length, by = t => D.workers.filter(w => dayStatus(w, s) === t);
   const A = by('غياب'), P = by('إذن'), L = by('إجازة'), present = total - A.length - P.length - L.length, pct = total ? Math.round(present / total * 100) : 0;
-  const lrow = w => tr([{ h: esc(w.name), c: 'nm' }, esc(w.section), { h: esc((w.abs.find(x => x.s === s) || {}).r || '—'), c: 'mut' }]);
+  const rec = w => w.abs.find(x => x.s === s) || {};
+  const lrow = w => tr([{ h: esc(w.name), c: 'nm' }, esc(w.section), { h: esc(rec(w).r || '—'), c: 'mut' }]);
+  const prow = w => tr([{ h: esc(w.name), c: 'nm' }, { h: esc(fmtExit(rec(w).x)), c: 'nm' }, { h: esc(rec(w).r || '—'), c: 'mut' }]);
   const lcols = [['العامل'], ['القسم', '32%'], ['السبب', '26%']];
-  const lst = (title, arr, two) => { if (!arr.length) return ''; if (!two || arr.length < 2) return H(`${title} (${arr.length})`) + tbl(lcols, arr.map(lrow), '', two ? 0 : undefined);
-    const half = Math.ceil(arr.length / 2); return H(`${title} (${arr.length})`) + `<div class="rs-two">${tbl(lcols, arr.slice(0, half).map(lrow), '', 0).replace('class="rs-t"', 'class="rs-t att"')}${tbl(lcols, arr.slice(half).map(lrow), '', 0).replace('class="rs-t"', 'class="rs-t att"')}</div>`; };
+  const pcols = [['العامل', '34%'], ['وقت الخروج', '26%'], ['السبب']];
+  const lst = (title, arr, two) => { const isP = title === 'الإذن', row = isP ? prow : lrow, cols = isP ? pcols : lcols; if (!arr.length) return ''; if (isP) return H(`${title} (${arr.length})`) + tbl(cols, arr.map(row), '', 0).replace('class="rs-t"', 'class="rs-t perm"'); if (!two || arr.length < 2) return H(`${title} (${arr.length})`) + tbl(cols, arr.map(row), '', two ? 0 : undefined);
+    const half = Math.ceil(arr.length / 2); return H(`${title} (${arr.length})`) + `<div class="rs-two">${tbl(cols, arr.slice(0, half).map(row), '', 0).replace('class="rs-t"', 'class="rs-t att"')}${tbl(cols, arr.slice(half).map(row), '', 0).replace('class="rs-t"', 'class="rs-t att"')}</div>`; };
   const body = lst('الغياب', A, true) + lst('الإذن', P, true) + lst('الإجازات', L, true) + (A.length + P.length + L.length ? '' : '<div class="rs-ok">كل العمال حاضرين</div>');
   return sheetFrame({ tone: A.length ? 'warn' : 'ok', score: present, unit: 'حاضر من ' + total, pill: A.length ? 'غياب ' + A.length : 'الكل حاضر',
     ranks: [{ v: pct + '%', l: 'نسبة الحضور' }, { v: total, l: 'إجمالي العمال' }], tiles: [[A.length, 'غياب'], [P.length, 'إذن'], [L.length, 'إجازة'], [present, 'حاضر']],
@@ -937,7 +959,7 @@ async function attAllPresent() {
 }
 function attCopyYest() {
   const s = isoToSerial(att.iso), y = isoToSerial(shiftISO(att.iso, -1)), snap = JSON.stringify(RAW); let n = 0;
-  RAW.workers.forEach(w => { const o = w.abs.find(x => x.s === y); if (o && !w.abs.some(x => x.s === s)) { w.abs.push({ s, t: o.t, r: o.r }); n++; } });
+  RAW.workers.forEach(w => { const o = w.abs.find(x => x.s === y); if (o && !w.abs.some(x => x.s === s)) { w.abs.push({ s, t: o.t, r: o.r, x: o.x }); n++; } });
   if (!n) return toast('مفيش غياب مسجل أمس يتنسخ');
   logAct('نسخ ' + n + ' تسجيل من أمس'); commit(); toast(`اتنسخ ${n} تسجيل من أمس`, { label: 'تراجع', fn: () => { RAW = JSON.parse(snap); commit(); } });
 }
